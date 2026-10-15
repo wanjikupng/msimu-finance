@@ -71,29 +71,60 @@ function timelineHtml(tl) {
 }
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
+let homeContractId = null;
+
+// Phone lock card: state in words, the latest unlock code, and a link to the
+// phone simulator. The code is what the customer would also receive by SMS.
+function lockCardHtml(lock) {
+  if (!lock) return "";
+  const until = lock.unlockedUntil ? fmtDate(lock.unlockedUntil) : "";
+  const text = {
+    UNLOCKED: `Your phone is unlocked until <strong>${esc(until)}</strong>. Each payment extends it.`,
+    GRACE: `Your payment is late. Your phone locks after <strong>${esc(until)}</strong>. Pay now to keep it unlocked.`,
+    LOCKED: "Your phone is locked because payments are behind. Pay to catch up and you'll get a new unlock code straight away.",
+    OWNED: "Paid in full. Your phone is unlocked for good.",
+  }[lock.lockState] || "";
+  const code = lock.latestCode;
+  return `<div class="card mt lock-card">
+    <div class="head-row"><h3>Phone lock</h3>${statusChip(lock.lockState)}</div>
+    <p class="small">${text}</p>
+    ${code ? `<p class="small" style="margin-bottom:0.3rem">Your latest unlock code${code.permanent ? " (permanent)" : ""}:</p>
+      <div class="btn-row" style="align-items:center"><span class="unlock-code" id="unlock-code">${esc(code.code)}</span><button class="btn btn-ghost btn-sm" type="button" id="copy-code">Copy</button></div>
+      <p class="small">Code #${esc(String(code.sequence))}, also sent by SMS. Enter it on your phone if it is locked; codes work without internet.</p>` : ""}
+    <div class="btn-row"><a class="btn btn-secondary btn-sm" href="device.html?device=${encodeURIComponent(lock.deviceCode)}" target="_blank" rel="noopener">Open my phone (simulator)</a>${lock.lockState === "LOCKED" || lock.lockState === "GRACE" ? `<a class="btn btn-primary btn-sm" href="#/pay">Pay now</a>` : ""}</div>
+  </div>`;
+}
+
 async function renderHome() {
   page().innerHTML = `<section class="wrap page-head"><h2>Home</h2><div class="skeleton" style="height:260px;border-radius:18px"></div></section>`;
   try {
     const [dashboard, apps] = await Promise.all([api("/users/me/dashboard"), api("/financing/applications/me")]);
     const contracts = dashboard.deviceLoans || [];
     const tl = dashboard.paymentTimeline || [];
-    const active = contracts.find((c) => c.loanStatus === "ACTIVE" || c.loanStatus === "OVERDUE") || contracts[0] || null;
+    const active = contracts.find((c) => c.id === homeContractId)
+      || contracts.find((c) => c.loanStatus === "ACTIVE" || c.loanStatus === "OVERDUE") || contracts[0] || null;
+    const lock = active ? await api(`/loans/${active.id}/device-lock`).catch(() => null) : null;
+    const lockVisual = lock ? { LOCKED: "overdue", GRACE: "due", OWNED: "owned" }[lock.lockState] : null;
     const pendingApp = Array.isArray(apps) ? apps.find((a) => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW") : null;
     const due = active ? dueLabel(active.nextPaymentDueDate) : "";
     let html = `<section class="wrap page-head"><div class="grid-2 uneven">`;
     if (!active) {
       html += `<div><h1>Track your phone.</h1><p>${esc(pendingApp ? `Application ${pendingApp.applicationNumber ?? ""} is ${pendingApp.status ?? ""}.` : "Choose your first phone to get started.")}</p><div class="btn-row"><a class="btn btn-primary" href="#/phones">${esc(pendingApp ? "Check status" : "Choose a phone")}</a></div></div><div class="card empty"><p class="small">No active contract yet.</p></div>`;
     } else {
-      const pct = ownershipPct(active), finish = finishDate(active), state = phoneStateFor(active, due.includes("late") ? -1 : 0), streak = paymentStreak(tl);
-      html += `<div><h1>${state === "owned" ? "You own it." : "Track your phone."}</h1><div class="btn-row"><a class="btn btn-primary" href="#/pay">${money(active.dailyAmount)} due</a><a class="btn btn-secondary btn-sm" href="#/activity">See payments</a></div><p class="small" style="margin-top:0.75rem">${esc(active.productName || "Phone")} · <span class="mono">${esc(active.contractNumber || "")}</span> · ${statusChip(active.loanStatus)}</p><div class="stat-grid"><div class="stat"><span>Ownership</span><strong>${Math.round(pct)}%</strong></div><div class="stat"><span>Remaining</span><strong>${money(active.amountRemaining)}</strong></div><div class="stat"><span>Next due</span><strong>${esc(due)}</strong></div><div class="stat"><span>Own it by</span><strong>${esc(fmtDate(finish))}</strong><em>~${esc(String(daysLeft(active)))} days</em></div><div class="stat"><span>Paid so far</span><strong>${money(active.amountPaid)}</strong></div><div class="stat"><span>Streak</span><strong>${esc(String(streak))} day${streak === 1 ? "" : "s"}</strong></div></div></div>`;
+      const pct = ownershipPct(active), finish = finishDate(active), state = lockVisual || phoneStateFor(active, due.includes("late") ? -1 : 0), streak = paymentStreak(tl);
+      html += `<div><h1>${state === "owned" ? "You own it." : "Track your phone."}</h1><div class="btn-row"><a class="btn btn-primary" href="#/pay">${money(active.dailyAmount)} due</a><a class="btn btn-secondary btn-sm" href="#/activity">See payments</a></div><p class="small" style="margin-top:0.75rem">${esc(active.productName || "Phone")} · <span class="mono">${esc(active.contractNumber || "")}</span> · ${statusChip(active.loanStatus)}</p><div class="stat-grid"><div class="stat"><span>Ownership</span><strong>${Math.round(pct)}%</strong></div><div class="stat"><span>Remaining</span><strong>${money(active.amountRemaining)}</strong></div><div class="stat"><span>Next due</span><strong>${esc(due)}</strong></div><div class="stat"><span>Own it by</span><strong>${esc(fmtDate(finish))}</strong><em>~${esc(String(daysLeft(active)))} days</em></div><div class="stat"><span>Paid so far</span><strong>${money(active.amountPaid)}</strong></div><div class="stat"><span>Streak</span><strong>${esc(String(streak))} day${streak === 1 ? "" : "s"}</strong></div></div>${lockCardHtml(lock)}</div>`;
       html += `<div class="card"><div class="phone-stage"><div id="home-phone" class="phone-figure"></div><div><div class="bignum">${Math.round(pct)}% paid</div><p class="small">${money(active.dailyAmount)}/day · ${esc(active.planName || "")}</p></div></div><div class="mt">${contractSelectHtml(contracts, active.id)}</div><div class="card mt" style="background:var(--paper)"><h3 class="bignum" style="font-size:1.1rem">Payoff planner</h3><p class="small">What if you pay a little more each day?</p><div class="grid-2" style="gap:0.6rem">${[10, 20, 50].map((x) => { const nd = daysLeft({ amountRemaining: active.amountRemaining, dailyAmount: active.dailyAmount + x }); return `<div class="card"><div class="kv"><dt>+KES ${x}/day</dt><dd>${esc(String(nd))} days</dd></div><div class="small">Save ${esc(String(Math.max(0, daysLeft(active) - nd)))} days</div></div>`; }).join("")}</div></div>${timelineHtml(tl)}</div>`;
     }
     html += `</div></section>`;
     page().innerHTML = html;
     const phoneEl = document.getElementById("home-phone");
-    if (phoneEl && active) renderPhone(phoneEl, { pct: ownershipPct(active), state: phoneStateFor(active, due.includes("late") ? -1 : 0), label: "Your phone ownership" });
+    if (phoneEl && active) renderPhone(phoneEl, { pct: ownershipPct(active), state: lockVisual || phoneStateFor(active, due.includes("late") ? -1 : 0), label: "Your phone ownership" });
     const sel = document.getElementById("home-contract");
-    if (sel) sel.addEventListener("change", renderHome);
+    if (sel) sel.addEventListener("change", (e) => { homeContractId = Number(e.target.value); renderHome(); });
+    document.getElementById("copy-code")?.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(document.getElementById("unlock-code").textContent.replace(/\s/g, "")); toast("Code copied.", "success"); }
+      catch { toast("Copy not available. Please type the code.", "error"); }
+    });
   } catch (err) {
     page().innerHTML = `<section class="wrap page-head"><div class="form-error">${esc(err.message || "Unable to load dashboard.")}</div></section>`;
   }
@@ -396,6 +427,12 @@ async function renderPay() {
         const dashboard = await api("/users/me/dashboard");
         const contract = (dashboard.deviceLoans || []).find((c) => c.id === activeId);
         if (contract) renderPhone(document.getElementById("pay-phone"), { pct: ownershipPct(contract), state: "active", label: "Updated ownership" });
+        // A payment that moves the paid-through date also issues a new unlock code.
+        const lock = await api(`/loans/${activeId}/device-lock`).catch(() => null);
+        const code = lock?.latestCode;
+        if (code && code.paymentReference === tx.transactionReference && document.getElementById("pay-result")) {
+          document.getElementById("pay-result").insertAdjacentHTML("beforeend", `<div class="card mt lock-card"><h3>New unlock code</h3><span class="unlock-code">${esc(code.code)}</span><p class="small mt">${code.permanent ? "Paid in full: this code unlocks your phone for good." : `Keeps your phone unlocked until ${esc(fmtDate(code.validUntil))}.`} Also sent by SMS.</p></div>`);
+        }
       }
       if (tx.status === "FAILED") { idemKey = crypto.randomUUID(); }
     }

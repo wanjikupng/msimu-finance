@@ -15,6 +15,7 @@ The phone loan is the business story. Underneath it is the infrastructure Tracom
 | **Financing** | Application → review → approve/reject. Terms are snapshotted at submission: installment = financed amount ÷ plan term, so a 90-day plan really ends in 90 days |
 | **Payment engine** | `INITIATED → PENDING → SUCCESS/FAILED → POSTED`; idempotency keys, balance reservations against double-spend, partial payments, receipts |
 | **Allocation ledger** | Every posted shilling is allocated to a specific day's installment; reversals replay the ledger instead of guessing |
+| **Device lock** | Each financed phone locks itself when payments stop. Every payment issues a signed 12-digit unlock code that the phone verifies **offline**; old codes can't be replayed and dates can't be edited |
 | **End-of-day** | Nightly arrears sweep moves contracts (and their devices) into and out of arrears; staff can run it on demand |
 | **Reconciliation** | Import the (simulated) M-PESA statement and match by provider reference: matched, amount/status mismatch, missing on either side, duplicates. Never changes a balance |
 | **Portals** | Customer portal, staff console (role-aware), partner portal for agents and merchants |
@@ -38,7 +39,7 @@ The database is in-memory and rebuilt on every start, including the demo portfol
 ### Run the tests
 
 ```bash
-mvn test        # 91 tests: unit + Spring integration tests
+mvn test        # 99 tests: unit + Spring integration tests
 ```
 
 ## Demo accounts
@@ -72,7 +73,7 @@ It then runs the arrears sweep, imports the simulated M-PESA statement (with two
 1. **Customer** (`demo@lipamdogo.com`): Home shows ownership, next due date and the payoff planner. **Pay** KES 70 → POSTED with a receipt; the phone "charges".
 2. **Phones**: pick a device, choose a plan and watch the server quote the daily installment, then e-sign and submit.
 3. **Loan officer**: Applications → open the new one → Start review → Approve. The contract and device handover happen in one transaction.
-4. **Otieno** (`otieno@demo.msimu`): an overdue customer with a locked phone. Pay to catch up and the contract returns to ACTIVE.
+4. **Device lock.** As admin, open **Devices**, filter OVERDUE, open Otieno's Redmi and click **Load key into phone simulator**. The simulator opens showing the phone **locked**. Sign in as **Otieno** (`otieno@demo.msimu`) in another tab: Home shows *Phone lock: LOCKED*. Pay KES 1,876 to catch up and a **new unlock code** appears. Type it into the phone's keypad and it unlocks, with no server involved. Try it again and it's refused. Click *+3 days* a few times and the phone locks again.
 5. **Admin → Overview**: portfolio at risk, the collections chart, Needs attention. **Run end-of-day** re-evaluates arrears.
 6. **Payments operator → Reconciliation**: 58/60 matched, plus an amount mismatch and an unknown paybill payment, flagged but never auto-corrected.
 
@@ -102,6 +103,8 @@ Reconciliation vs provider statement    (evidence only, never money)
 ```
 index.html / login.html / signup.html   Landing page and auth
 app.html      + js/customer.js          Customer portal
+device.html   + js/device.js            Phone simulator (lock agent, offline)
+js/unlock-codec.js                      Unlock-code verification (mirrors UnlockCodeCodec.java)
 admin.html    + js/admin.js             Staff console
 partner.html  + js/partner.js           Agent / merchant portal
 js/api.js     fetch wrapper, session, 401 handling
@@ -126,6 +129,9 @@ All under `/api/v1`. Every endpoint except register and login needs `Authorizati
 | `/admin/operations/arrears-sweep` | POST | staff | Run end-of-day now |
 | `/admin/reconciliation/feed/simulate` | POST | ADMIN, PAYMENTS_OPERATOR | Import simulated M-PESA statement |
 | `/admin/reconciliation/runs` | POST | ADMIN, PAYMENTS_OPERATOR | Reconcile |
+| `/loans/{id}/device-lock` | GET | owner, staff | Lock state and latest unlock code |
+| `/admin/devices/{id}/lock` | GET | staff, TECHNICIAN | Lock state and code history |
+| `/admin/devices/{id}/provisioning` | POST | ADMIN, TECHNICIAN | Device key for the lock agent |
 | `/admin/devices`, `/admin/merchants`, `/admin/agents` | GET/POST | ADMIN | Inventory and network |
 
 ## Configuration
@@ -136,6 +142,7 @@ All under `/api/v1`. Every endpoint except register and login needs `Authorizati
 | `TRACOM_ADMIN_PASSWORD`, `TRACOM_DEMO_PASSWORD`, `TRACOM_AGENT_PASSWORD`, `TRACOM_MERCHANT_PASSWORD` | see table above | Seed account passwords |
 | `TRACOM_DEMO_PORTFOLIO` | `true` | Seed the demo portfolio |
 | `TRACOM_ARREARS_CRON` | `0 5 0 * * *` | When the nightly arrears sweep runs |
+| `TRACOM_LOCK_GRACE_DAYS` | `2` | Days after a missed due date before the phone locks |
 
 ## Documentation
 
@@ -147,10 +154,11 @@ Design notes per phase, in [`docs/`](docs):
 4. [Payment engine, reservations, allocations](docs/PHASE4-PAYMENTS.md)
 5. [Reconciliation](docs/PHASE5A-RECONCILIATION.md)
 6. [Operations hardening: end-of-day, terms, demo portfolio](docs/PHASE5.5-OPERATIONS.md)
+7. [Pay-as-you-go device lock](docs/PHASE6-DEVICE-LOCK.md)
 
 ## Roadmap
 
-- **Device lock & unlock tokens:** an OVERDUE device locks, and each payment issues an offline unlock code.
+- **Earned grace days:** a good payment streak earns extra days before the phone locks.
 - **Agent POS:** agents collect cash repayments on a simulated payment terminal, with terminal management and end-of-day cash-up.
 - **Settlement & commissions:** daily merchant settlement batches and agent commissions.
 - **Live M-PESA sandbox:** swap the mock adapter for Safaricom Daraja (STK Push, C2B).

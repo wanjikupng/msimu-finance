@@ -461,10 +461,12 @@ async function renderDevices(opts = {}) {
         <div class="kv"><dt>Merchant</dt><dd>${esc(device.merchantName || "—")}</dd></div>
         <div class="kv"><dt>Agent</dt><dd>${esc(device.agentName || "—")}</dd></div>
         <div class="kv"><dt>Customer</dt><dd>${esc(device.customerName || "—")}</dd></div>
+        <div id="device-lock-slot"></div>
         <div class="btn-row mt">
           ${device.status === "AVAILABLE" || device.status === "RESERVED" || device.status === "REPAIR" ? `<button class="btn btn-primary btn-sm" data-action="release">Release to warehouse</button>` : ""}
           <button class="btn btn-secondary btn-sm" data-action="status">Change status</button>
         </div>`);
+      if (["FINANCED", "OVERDUE", "PAID_OFF"].includes(device.status)) renderDeviceLock(device);
       document.querySelector("[data-action='release']")?.addEventListener("click", async () => {
         const ok = await confirmDialog({ title: "Release device?", message: "This will return the device to AVAILABLE inventory." });
         if (!ok) return;
@@ -482,6 +484,45 @@ async function renderDevices(opts = {}) {
     render();
   } catch (err) {
     page().innerHTML = `<section class="wrap page-head"><div class="form-error">${esc(err.message || "Unable to load devices.")}</div></section>`;
+  }
+}
+
+// Device lock section inside the device drawer: current state, the code the
+// customer should have, the full code history, and (admins) loading the
+// device key into the phone simulator — what a technician does at handover.
+async function renderDeviceLock(device) {
+  const slot = document.getElementById("device-lock-slot");
+  if (!slot) return;
+  slot.innerHTML = `<h3 class="mt">Device lock</h3><div class="skeleton" style="height:90px"></div>`;
+  try {
+    const lock = await api(`/admin/devices/${device.id}/lock`);
+    const latest = lock.latestCode;
+    slot.innerHTML = `
+      <h3 class="mt">Device lock</h3>
+      <div class="kv"><dt>State</dt><dd>${statusChip(lock.lockState)}</dd></div>
+      <div class="kv"><dt>Unlocked until</dt><dd>${latest?.permanent ? "Forever (owned)" : esc(fmtDate(lock.unlockedUntil))}</dd></div>
+      <div class="kv"><dt>Grace</dt><dd>${esc(String(lock.graceDays))} days after a missed due date</dd></div>
+      ${latest ? `<div class="kv"><dt>Current code</dt><dd><span class="mono">${esc(latest.code)}</span> <span class="small">#${esc(String(latest.sequence))}</span></dd></div>` : ""}
+      <details class="mt"><summary class="small">Code history (${esc(String(lock.history.length))})</summary>
+        <div class="table-scroll"><table class="data"><thead><tr><th>#</th><th>Code</th><th>Until</th><th>Reason</th><th>Payment</th></tr></thead><tbody>${lock.history.map((c) => `<tr><td>${esc(String(c.sequence))}</td><td class="mono">${esc(c.code)}</td><td>${c.permanent ? "Forever" : esc(fmtDate(c.validUntil))}</td><td>${statusChip(c.reason)}</td><td class="mono">${esc(c.paymentReference || "—")}</td></tr>`).join("")}</tbody></table></div>
+      </details>
+      ${can("ADMIN") ? `<div class="btn-row mt"><button class="btn btn-secondary btn-sm" data-action="flash">Load key into phone simulator</button></div><p class="small">Copies this device's secret key into the simulator in this browser, as a technician would at handover, then opens it.</p>` : ""}`;
+    slot.querySelector("[data-action='flash']")?.addEventListener("click", async () => {
+      try {
+        const p = await api(`/admin/devices/${device.id}/provisioning`, { method: "POST" });
+        const agent = {
+          deviceCode: p.deviceCode, contractNumber: p.contractNumber, productName: p.productName,
+          secretKey: p.secretKey, anchorDate: p.anchorDate, graceDays: p.graceDays,
+          lastSequence: 0, unlockedUntil: null, permanent: false, clockOffsetDays: 0,
+          bootCode: p.latestCode ? p.latestCode.code : null,
+        };
+        localStorage.setItem(`msimu.lockagent.${p.deviceCode}`, JSON.stringify(agent));
+        window.open(`device.html?device=${encodeURIComponent(p.deviceCode)}`, "_blank", "noopener");
+        toast(`Key for ${p.deviceCode} loaded into the phone simulator.`, "success");
+      } catch (e) { toast(e.message || "Provisioning failed.", "error"); }
+    });
+  } catch (e) {
+    slot.innerHTML = `<h3 class="mt">Device lock</h3><p class="small">${esc(e.message || "No lock information.")}</p>`;
   }
 }
 

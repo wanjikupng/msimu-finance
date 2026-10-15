@@ -83,6 +83,14 @@ const CHIP_CLASS = {
   CLOSED: "chip-grey",
   SUSPENDED: "chip-red",
   ASSIGNED: "chip-grey",
+  // device lock
+  UNLOCKED: "chip-green",
+  GRACE: "chip-amber",
+  LOCKED: "chip-red",
+  OWNED: "chip-green",
+  PROVISIONED: "chip-grey",
+  PAYMENT: "chip-green",
+  REVERSAL: "chip-amber",
 };
 
 export function statusChip(status) {

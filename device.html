@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phone Simulator — M-Simu Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body class="sim-body">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" aria-label="M-Simu Finance home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">Phone simulator</span>
+      </a>
+      <span class="topbar-spa"></span>
+      <span class="chip chip-indigo rail-tag">Works offline: no server calls</span>
+    </div>
+  </header>
+
+  <main class="wrap sim-layout">
+    <section class="sim-stage" aria-label="Simulated phone">
+      <div class="sim-phone">
+        <div class="sim-notch" aria-hidden="true"></div>
+        <div class="sim-statusbar"><span id="sim-clock">--</span><span id="sim-net">Offline</span></div>
+        <div class="sim-date" id="sim-date"></div>
+        <div class="sim-screen" id="sim-screen" aria-live="polite"></div>
+        <div class="sim-homebar" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <aside class="sim-side">
+      <div class="card">
+        <h3>How this works</h3>
+        <p class="small">This page plays the part of the financed phone. Its lock agent holds the device key that a technician loaded at handover, and it checks unlock codes on its own, with no network. That's how a phone in an area with no data can still be unlocked from an SMS code.</p>
+        <p class="small">Each code is signed for this one phone, says how long the phone stays unlocked, and works once.</p>
+      </div>
+      <div class="card" id="sim-info"></div>
+      <div class="card demo-box">
+        <h3>Demo controls</h3>
+        <p class="small">Move the phone's clock forward to show it locking when payments stop.</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" id="sim-plus1" type="button">Phone clock +1 day</button>
+          <button class="btn btn-secondary btn-sm" id="sim-plus3" type="button">+3 days</button>
+          <button class="btn btn-ghost btn-sm" id="sim-reset-clock" type="button">Reset clock</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost btn-sm" id="sim-wipe" type="button">Factory reset (remove key)</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module" src="js/device.js"></script>
+</body>
+</html>

@@ -422,3 +422,51 @@ table.data tr.clickable { cursor: pointer; }
 .head-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .head-row h2 { margin: 0; }
 .page-head > .head-row { margin-bottom: 0.75rem; }
+
+/* ---------- phone simulator (device.html) ---------- */
+.sim-layout { display: grid; gap: 1.5rem; padding-top: 1.5rem; padding-bottom: 3rem; }
+@media (min-width: 900px) { .sim-layout { grid-template-columns: auto minmax(0, 1fr); align-items: start; } }
+.sim-side { display: grid; gap: 1rem; }
+.sim-side .card + .card { margin-top: 0; }
+.sim-stage { display: flex; justify-content: center; }
+.sim-phone {
+  width: 320px; max-width: 100%; height: 640px; border-radius: 44px; background: #0e2330;
+  padding: 14px; position: relative; display: flex; flex-direction: column;
+  box-shadow: 0 18px 40px rgba(14, 35, 48, 0.25);
+}
+.sim-notch { width: 110px; height: 22px; background: #0e2330; border-radius: 0 0 14px 14px; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2; }
+.sim-statusbar { display: flex; justify-content: space-between; font-size: 0.72rem; color: #fff; padding: 4px 18px 6px; background: #12324a; border-radius: 30px 30px 0 0; }
+.sim-screen { flex: 1; background: #f2f6f7; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; border-radius: 0 0 30px 30px; }
+.sim-homebar { width: 110px; height: 5px; border-radius: 3px; background: #fff; opacity: 0.6; margin: 8px auto 0; }
+.sim-center { margin: auto 0; text-align: center; }
+.sim-icon { font-size: 2.4rem; line-height: 1; margin-bottom: 0.5rem; }
+.sim-locked { background: linear-gradient(180deg, #3a1f22 0%, #1a2a35 100%); color: #fff; }
+.sim-locked p, .sim-locked .small { color: #e8dede; }
+.sim-lockhead { text-align: center; }
+.sim-lockhead h3 { color: #fff; }
+.sim-entry { text-align: center; font-size: 1.15rem; letter-spacing: 0.08em; background: rgba(255, 255, 255, 0.92); color: var(--ink); border-radius: var(--radius-m); padding: 0.5rem; }
+.sim-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; }
+.sim-keypad button { font: inherit; font-size: 1.1rem; font-weight: 600; padding: 0.55rem 0; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+.sim-keypad button:hover { background: var(--charge-tint); }
+.sim-keypad button[data-key="OK"] { background: var(--charge); color: #fff; border-color: var(--charge); }
+.sim-emergency { text-align: center; font-size: 0.75rem; color: #e8dede; margin-top: auto; }
+.sim-msg { border-radius: var(--radius-m); padding: 0.5rem 0.7rem; font-size: 0.85rem; font-weight: 600; text-align: center; }
+.sim-msg.ok { background: var(--charge-tint); color: var(--charge); }
+.sim-msg.bad { background: var(--lock-tint); color: var(--lock-text); }
+.sim-banner { border-radius: var(--radius-m); padding: 0.55rem 0.75rem; font-size: 0.85rem; font-weight: 600; background: #fff; border: 1px solid var(--line); text-align: center; }
+.sim-banner.ok { background: var(--charge-tint); color: var(--charge); border-color: transparent; }
+.sim-banner.warn { background: var(--amber-tint); color: var(--amber-text); border-color: transparent; }
+.sim-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem 0.4rem; padding: 0.5rem 0; }
+.sim-app { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.68rem; color: var(--slate); }
+.sim-app span { width: 44px; height: 44px; border-radius: 13px; background: var(--charge); color: #fff; display: grid; place-items: center; font-weight: 700; font-family: var(--font-head); }
+.sim-owned .sim-app span { background: var(--charge-bright); }
+.sim-codebox { margin-top: auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-m); padding: 0.5rem 0.6rem; display: grid; gap: 0.5rem; }
+.sim-codebox summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.sim-codebox[open] { display: grid; gap: 0.5rem; }
+.sim-setup { background: #fff; }
+
+/* ---------- unlock code (customer portal / staff drawer) ---------- */
+.unlock-code { font-family: var(--font-mono); font-size: 1.45rem; letter-spacing: 0.06em; font-weight: 700; color: var(--ink); background: var(--paper); border: 1px dashed var(--line); border-radius: var(--radius-m); padding: 0.55rem 0.8rem; display: inline-block; }
+.lock-card .head-row { margin-bottom: 0.5rem; }
+.sim-statusbar { padding: 4px 26px 6px; }
+.sim-date { background: #12324a; color: #cfe3ea; font-size: 0.72rem; text-align: center; padding: 0 0 6px; }
