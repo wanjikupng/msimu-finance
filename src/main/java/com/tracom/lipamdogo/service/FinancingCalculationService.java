@@ -6,6 +6,7 @@ import com.tracom.lipamdogo.model.Product;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 /**
  * Single authoritative home for financing arithmetic. Controllers display the
@@ -17,7 +18,9 @@ import java.math.BigDecimal;
  *   <li>deposit must be non-negative and strictly below the device price;</li>
  *   <li>deposit must meet the product's minimum ({@code downPayment});</li>
  *   <li>financed principal = device price − deposit;</li>
- *   <li>installment = the plan's daily amount, cadence DAILY;</li>
+ *   <li>installment = principal / plan duration in days, rounded up to the
+ *       whole shilling, cadence DAILY — so the contract finishes within the
+ *       plan's term (the last installment is the smaller remainder);</li>
  *   <li>total payable = principal (no interest or fees in this prototype).</li>
  * </ul>
  */
@@ -52,12 +55,18 @@ public class FinancingCalculationService {
                     "Deposit must meet the minimum required deposit of KES " + product.getDownPayment() + ".");
         }
 
+        Integer duration = plan.getDurationDays();
+        if (duration == null || duration <= 0) {
+            throw new IllegalArgumentException("Payment plan has no valid duration.");
+        }
+
         BigDecimal principal = price.subtract(depositAmount);
+        BigDecimal installment = principal.divide(BigDecimal.valueOf(duration), 0, RoundingMode.CEILING);
         return new FinancingTerms(
                 price,
                 depositAmount,
                 principal,
-                plan.getDailyAmount(),
+                installment,
                 PaymentFrequency.DAILY,
                 plan.getPlanName(),
                 plan.getDurationDays(),

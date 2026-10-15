@@ -479,7 +479,7 @@ async function renderCatalog() {
         <h2>Catalog</h2>
         <div class="grid-2">
           <div class="card"><h3>Products</h3><button class="btn btn-primary btn-sm mt" id="add-product-btn">Add product</button><div class="table-scroll mt"><table class="data"><thead><tr><th>Name</th><th>Price</th><th>Deposit</th><th>Daily</th></tr></thead><tbody>${products.map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.fullPrice)}</td><td>${money(p.downPayment)}</td><td>${money(p.dailyAmount)}</td></tr>`).join("")}</tbody></table></div></div>
-          <div class="card"><h3>Payment plans</h3><button class="btn btn-primary btn-sm mt" id="add-plan-btn">Add plan</button><div class="table-scroll mt"><table class="data"><thead><tr><th>Name</th><th>Days</th><th>Daily</th></tr></thead><tbody>${plans.map((p) => `<tr><td>${esc(p.planName)}</td><td>${esc(String(p.durationDays))}</td><td>${money(p.dailyAmount)}</td></tr>`).join("")}</tbody></table></div></div>
+          <div class="card"><h3>Payment plans</h3><button class="btn btn-primary btn-sm mt" id="add-plan-btn">Add plan</button><div class="table-scroll mt"><table class="data"><thead><tr><th>Name</th><th>Term</th><th>A15 example</th></tr></thead><tbody>${plans.map((p) => `<tr><td>${esc(p.planName)}</td><td>${esc(String(p.durationDays))} days</td><td>${money(Math.ceil(14000 / Math.max(1, p.durationDays)))}/day</td></tr>`).join("")}</tbody></table></div></div>
           <div class="card"><h3>Payment modes</h3><button class="btn btn-primary btn-sm mt" id="add-mode-btn">Add mode</button><div class="table-scroll mt"><table class="data"><thead><tr><th>Name</th><th>Description</th></tr></thead><tbody>${modes.map((m) => `<tr><td>${esc(m.modeName)}</td><td>${esc(m.description || "—")}</td></tr>`).join("")}</tbody></table></div></div>
         </div>
       </section>`;
@@ -498,12 +498,12 @@ async function renderCatalog() {
     document.getElementById("add-plan-btn").addEventListener("click", () => {
       openModal({ title: "Add payment plan", bodyHTML: `<form id="plan-form" novalidate>
         <div class="field"><label>Name</label><input id="pl-name" type="text" required /></div>
-        <div class="grid-2"><div class="field"><label>Days</label><input id="pl-days" type="number" min="1" required /></div><div class="field"><label>Daily (KES)</label><input id="pl-daily" type="number" min="1" required /></div></div>
-        <div class="field"><label>Deposit</label><input id="pl-deposit" type="number" min="0" required /></div>
+        <div class="field"><label>Term (days)</label><input id="pl-days" type="number" min="7" max="730" required /></div>
+        <p class="small">The daily installment is worked out per contract: financed amount ÷ term, rounded up to the shilling.</p>
         <div class="btn-row"><button class="btn btn-primary" type="submit">Add</button></div></form>` });
       document.getElementById("plan-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        try { await api("/payment-plans", { method: "POST", body: { planName: document.getElementById("pl-name").value.trim(), durationDays: Number(document.getElementById("pl-days").value), dailyAmount: Number(document.getElementById("pl-daily").value), depositAmount: Number(document.getElementById("pl-deposit").value) } }); toast("Plan added.", "success"); document.querySelector(".modal-close")?.click(); renderCatalog(); } catch (err) { toast(err.message || "Failed.", "error"); }
+        try { await api("/payment-plans", { method: "POST", body: { planName: document.getElementById("pl-name").value.trim(), durationDays: Number(document.getElementById("pl-days").value) } }); toast("Plan added.", "success"); document.querySelector(".modal-close")?.click(); renderCatalog(); } catch (err) { toast(err.message || "Failed.", "error"); }
       });
     });
     document.getElementById("add-mode-btn").addEventListener("click", () => {

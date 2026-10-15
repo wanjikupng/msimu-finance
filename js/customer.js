@@ -190,7 +190,7 @@ async function renderPhonePlan(slot) {
       </div>
       <div class="card">
         <div class="field"><label for="phone-deposit">Deposit (KES)</label><input id="phone-deposit" type="number" min="${esc(String(product.downPayment || 0))}" max="${esc(String(maxDeposit))}" step="50" value="${esc(String(phonesData.deposit))}" /></div>
-        <div class="field"><label for="phone-plan">Payment plan</label><select id="phone-plan"><option value="">Choose a plan…</option>${plans.map((pl) => `<option value="${esc(String(pl.id))}" ${phonesData.selectedPlan?.id === pl.id ? "selected" : ""}>${esc(pl.planName)} — ${esc(String(pl.durationDays))} days · ${money(pl.dailyAmount)}/day</option>`).join("")}</select></div>
+        <div class="field"><label for="phone-plan">Payment plan</label><select id="phone-plan"><option value="">Choose a plan…</option>${plans.map((pl) => `<option value="${esc(String(pl.id))}" ${phonesData.selectedPlan?.id === pl.id ? "selected" : ""}>${esc(pl.planName)} — own it in ${esc(String(pl.durationDays))} days</option>`).join("")}</select></div>
         <div id="phone-quote" class="card mt" style="background:var(--paper)"></div>
         <div class="btn-row" style="margin-top:1rem"><a class="btn btn-secondary" href="#/phones" data-back>Back to catalog</a><button class="btn btn-primary" id="phone-next" disabled>Continue</button></div>
       </div>

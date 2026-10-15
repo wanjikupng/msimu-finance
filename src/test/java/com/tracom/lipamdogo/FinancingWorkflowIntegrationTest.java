@@ -102,7 +102,7 @@ class FinancingWorkflowIntegrationTest {
         List<String> names = JsonPath.read(plans.getResponse().getContentAsString(), "$[*].planName");
         List<Integer> ids = JsonPath.read(plans.getResponse().getContentAsString(), "$[*].id");
         for (int i = 0; i < names.size(); i++) {
-            if ("Classic 90 Days".equals(names.get(i))) {
+            if ("Flex 200 Days".equals(names.get(i))) {
                 return ids.get(i).longValue();
             }
         }
@@ -253,7 +253,7 @@ class FinancingWorkflowIntegrationTest {
         assertThat(JsonPath.<Number>read(contractBody, "$.amountRemaining").intValue()).isEqualTo(14000);
         assertThat(JsonPath.<Number>read(contractBody, "$.dailyAmount").intValue()).isEqualTo(70);
         assertThat(JsonPath.<Number>read(contractBody, "$.deviceId").longValue()).isEqualTo(deviceId);
-        assertThat((String) JsonPath.read(contractBody, "$.planName")).isEqualTo("Classic 90 Days");
+        assertThat((String) JsonPath.read(contractBody, "$.planName")).isEqualTo("Flex 200 Days");
         assertThat((String) JsonPath.read(contractBody, "$.paymentFrequency")).isEqualTo("DAILY");
 
         // Application is APPROVED and linked.

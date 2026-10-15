@@ -6,6 +6,7 @@ import com.tracom.lipamdogo.model.PaymentMode;
 import com.tracom.lipamdogo.model.PaymentPlan;
 import com.tracom.lipamdogo.repository.PaymentModeRepository;
 import com.tracom.lipamdogo.repository.PaymentPlanRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -35,12 +37,12 @@ public class AdminController {
 
     @PostMapping("/payment-plans")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PaymentPlan> createPaymentPlan(@RequestBody PaymentPlanRequest request) {
+    public ResponseEntity<PaymentPlan> createPaymentPlan(@Valid @RequestBody PaymentPlanRequest request) {
         PaymentPlan plan = new PaymentPlan();
         plan.setPlanName(request.planName());
         plan.setDurationDays(request.durationDays());
-        plan.setDepositAmount(request.depositAmount());
-        plan.setDailyAmount(request.dailyAmount());
+        plan.setDepositAmount(request.depositAmount() == null ? BigDecimal.ZERO : request.depositAmount());
+        plan.setDailyAmount(request.dailyAmount() == null ? BigDecimal.ZERO : request.dailyAmount());
         return ResponseEntity.ok(paymentPlanRepository.save(plan));
     }
 
