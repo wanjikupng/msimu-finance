@@ -174,6 +174,8 @@ Design notes per phase, in [`docs/`](docs):
 8. [Cashless agent terminals](docs/PHASE7-AGENT-TERMINALS.md)
 9. [Commissions and settlement](docs/PHASE8-SETTLEMENT-COMMISSIONS.md)
 
+**Testing it yourself:** [step-by-step testing guide](docs/TESTING-GUIDE.md), from cloning the repo to checking every feature with the demo accounts.
+
 ## Roadmap
 
 - **Earned grace days:** a good payment streak earns extra days before the phone locks.
