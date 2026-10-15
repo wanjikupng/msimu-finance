@@ -125,9 +125,8 @@ public class PosService {
                 .filter(c -> c.getStatus() == LoanStatus.ACTIVE || c.getStatus() == LoanStatus.OVERDUE)
                 .map(this::toPosContract)
                 .toList();
-        String msisdn = normalizeMsisdn(customer.getPhoneNumber());
         return new PosCustomerResponse(displayName(customer.getFullName()),
-                PaymentTransactionResponse.maskMsisdn(msisdn), msisdn, contracts);
+                PaymentTransactionResponse.maskMsisdn(normalizeMsisdn(customer.getPhoneNumber())), contracts);
     }
 
     /** Sends the M-PESA prompt to the customer's phone. The payment stays PENDING until they respond. */
@@ -140,9 +139,15 @@ public class PosService {
         if (contract.getCustomer().getRole() != Role.CUSTOMER) {
             throw new IllegalArgumentException("Payments can only be collected for customers.");
         }
+        String payer = request.payerMsisdn() == null || request.payerMsisdn().isBlank()
+                ? normalizeMsisdn(contract.getCustomer().getPhoneNumber())
+                : normalizeMsisdn(request.payerMsisdn());
+        if (payer == null) {
+            throw new IllegalArgumentException("The customer has no valid M-PESA number on file. Enter the number to prompt.");
+        }
         terminal.setLastSeenAt(SystemTime.now());
         return paymentService.initiateAtTerminal(terminal, terminal.getAgent(), contract.getId(),
-                request.amount(), normalizeMsisdn(request.payerMsisdn()), idempotencyKey);
+                request.amount(), payer, idempotencyKey);
     }
 
     @Transactional(readOnly = true)

@@ -2,8 +2,8 @@
 
 A financed phone keeps working while the customer keeps paying. When payments
 stop it locks, and a payment unlocks it again with a short code. The code works
-with **no data connection**, so it suits customers who top up in cash at an
-agent or live where coverage is patchy.
+with **no data connection**, so it suits customers who live where coverage
+is patchy or whose data bundle has run out.
 
 ## How it fits together
 

@@ -21,9 +21,9 @@ export const DEMO_ACCOUNTS = [
   { label: "Admin", email: "admin@tracom.local", password: "Admin@1234" },
 ];
 
-// Payment channels. Only MPESA has a working provider adapter; the rest are
-// shown disabled with "Coming soon".
-export const CHANNELS = ["MPESA", "CARD", "BANK", "AGENT", "POS", "USSD"];
+// Cashless: M-PESA is the only payment rail. Customers pay from their own
+// phone or approve a request an agent sends from a terminal.
+export const CHANNELS = ["MPESA"];
 
 // Demo simulation knob honored only by the mock provider (never real money).
 export const MOCK_SCENARIOS = ["AUTO", "SUCCESS", "PENDING", "FAILED"];

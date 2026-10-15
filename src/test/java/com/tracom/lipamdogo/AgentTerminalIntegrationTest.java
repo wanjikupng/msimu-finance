@@ -65,8 +65,10 @@ class AgentTerminalIntegrationTest {
         assertThat((String) JsonPath.read(lookup, "$.maskedPhone")).contains("*****").doesNotContain(phone.substring(2, 7));
         assertThat(JsonPath.<Integer>read(lookup, "$.contracts[0].contractId").longValue()).isEqualTo(contractId);
 
-        // Send the prompt: PENDING, and the balance has not moved.
-        String pending = collect(agent, contractId, "70", phone, UUID.randomUUID().toString());
+        // Send the prompt to the customer's registered number: PENDING, and the balance has not moved.
+        assertThat(lookup).doesNotContain(phone.substring(1));
+        String pending = collect(agent, contractId, "70", null, UUID.randomUUID().toString());
+        assertThat((String) JsonPath.read(pending, "$.payerMsisdn")).endsWith(phone.substring(7));
         String reference = JsonPath.read(pending, "$.transactionReference");
         assertThat((String) JsonPath.read(pending, "$.status")).isEqualTo("PENDING");
         assertThat((String) JsonPath.read(pending, "$.channel")).isEqualTo("MPESA");
@@ -209,6 +211,9 @@ class AgentTerminalIntegrationTest {
     }
 
     private static String collectBody(Long contractId, String amount, String phone) {
+        if (phone == null) {
+            return "{\"contractId\": %d, \"amount\": %s}".formatted(contractId, amount);
+        }
         return "{\"contractId\": %d, \"amount\": %s, \"payerMsisdn\": \"%s\"}".formatted(contractId, amount, phone);
     }
 

@@ -251,7 +251,7 @@ async function renderPhonePlan(slot) {
         <dl class="kv"><dt>Daily installment</dt><dd>${money(q.installmentAmount)}</dd></dl>
         <dl class="kv"><dt>Plan</dt><dd>${esc(q.paymentPlanName || "")}</dd></dl>
         <dl class="kv"><dt>Total cost</dt><dd>${money(q.totalPayable)}</dd></dl>
-        <dl class="kv"><dt>Extra over cash price</dt><dd>${money(extra)} ${extra === 0 ? '<span class="chip chip-green">No interest</span>' : ""}</dd></dl>`;
+        <dl class="kv"><dt>Extra over shop price</dt><dd>${money(extra)} ${extra === 0 ? '<span class="chip chip-green">No interest</span>' : ""}</dd></dl>`;
       nextBtn.disabled = false;
     } catch (err) {
       quoteSlot.innerHTML = `<div class="form-error">${esc(err.message || "Could not get quote.")}</div>`;
@@ -280,7 +280,7 @@ function renderPhoneReview(slot) {
         <dl class="kv"><dt>Financed</dt><dd>${money(q.requestedPrincipal)}</dd></dl>
         <dl class="kv"><dt>Daily</dt><dd>${money(q.installmentAmount)}</dd></dl>
         <dl class="kv"><dt>Plan</dt><dd>${esc(q.paymentPlanName || "")}</dd></dl>
-        <dl class="kv"><dt>Extra over cash</dt><dd>${money(Number(q.depositAmount || 0) + Number(q.totalPayable || 0) - Number(q.devicePrice || 0))}</dd></dl>
+        <dl class="kv"><dt>Extra over shop price</dt><dd>${money(Number(q.depositAmount || 0) + Number(q.totalPayable || 0) - Number(q.devicePrice || 0))}</dd></dl>
         <div class="btn-row"><a class="btn btn-secondary" href="#/phones" data-back>Back</a><button class="btn btn-primary" id="phone-next">Review & sign</button></div>
       </div>
     </div>`;
@@ -386,7 +386,7 @@ async function renderPay() {
             <div class="field"><label for="pay-contract">Contract</label><select id="pay-contract">${contracts.map((ct) => `<option value="${esc(String(ct.id))}" ${ct.id === activeId ? "selected" : ""}>${esc(ct.productName || "")} · ${esc(ct.contractNumber || "")} · ${money(ct.amountRemaining)} left</option>`).join("")}</select></div>
             <div class="field"><label for="pay-amount">Amount (KES, max ${money(max)})</label><input id="pay-amount" type="number" min="1" max="${esc(String(max))}" step="1" value="${esc(String(amount))}" /></div>
             <div class="btn-row" style="flex-wrap:wrap">${[{ l: "Daily " + money(c.dailyAmount), v: c.dailyAmount }, { l: "3 days", v: c.dailyAmount * 3 }, { l: "7 days", v: c.dailyAmount * 7 }, { l: "Clear balance", v: max }].map((b) => `<button type="button" class="btn btn-secondary btn-sm chip-amount" data-amt="${b.v}">${esc(b.l)}</button>`).join("")}</div>
-            <div class="field" style="margin-top:0.9rem"><label for="pay-channel">Channel</label><select id="pay-channel"><option value="MPESA">M-PESA (simulated)</option><option value="CARD" disabled>Card — Coming soon</option><option value="BANK" disabled>Bank — Coming soon</option><option value="AGENT" disabled>Agent — Coming soon</option><option value="POS" disabled>POS — Coming soon</option><option value="USSD" disabled>USSD — Coming soon</option></select></div>
+            <div class="field" style="margin-top:0.9rem"><label>Pay with</label><div class="mpesa-pill">M-PESA <span class="small">(simulated)</span></div><p class="small">All payments go through M-PESA. You can also pay at any M-Simu agent: they send the M-PESA request to your phone and you approve it with your PIN. Never give cash to anyone.</p></div>
             <details class="demo-box"><summary>Demo controls</summary><div class="field"><label for="pay-scenario">Mock scenario</label><select id="pay-scenario"><option value="AUTO">Provider decides (success)</option><option value="SUCCESS">Force success</option><option value="PENDING">Force pending</option><option value="FAILED">Force failure</option></select></div></details>
             <div id="pay-result" class="mt"></div>
             <div class="btn-row"><button class="btn btn-primary" id="pay-btn">Pay ${money(amount)}</button></div>
@@ -476,7 +476,7 @@ async function renderActivity() {
     }
     function renderPayments(slot, txns) {
       if (!txns.length) { slot.innerHTML = emptyState("No payments yet", "Make a payment to get started.", "Pay now", "#/pay"); return; }
-      slot.innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th>Date</th><th>Ref</th><th>Amount</th><th>Channel</th><th>Status</th><th></th></tr></thead><tbody>${txns.map((tx) => `<tr><td>${esc(fmtDateTime(tx.requestedAt))}</td><td class="mono">${esc(tx.transactionReference || "")}</td><td>${money(tx.amount)}</td><td>${esc(tx.channel || "")}</td><td>${statusChip(tx.status)}</td><td>${tx.status === "POSTED" ? `<button class="btn btn-ghost btn-sm" data-receipt="${esc(tx.transactionReference || "")}">Receipt</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+      slot.innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th>Date</th><th>Ref</th><th>Amount</th><th>Paid by</th><th>Status</th><th></th></tr></thead><tbody>${txns.map((tx) => `<tr><td>${esc(fmtDateTime(tx.requestedAt))}</td><td class="mono">${esc(tx.transactionReference || "")}</td><td>${money(tx.amount)}</td><td>M-PESA${tx.origin === "AGENT_TERMINAL" ? `<br><span class="small">via agent ${esc(tx.agentName || "")} · ${esc(tx.terminalCode || "")}</span>` : ""}</td><td>${statusChip(tx.status)}</td><td>${tx.status === "POSTED" ? `<button class="btn btn-ghost btn-sm" data-receipt="${esc(tx.transactionReference || "")}">Receipt</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
       slot.querySelectorAll("[data-receipt]").forEach((btn) => btn.addEventListener("click", async () => {
         try { const r = await api(`/payments/${btn.dataset.receipt}/receipt`); showReceipt(r); } catch (e) { toast(e.message || "Could not load receipt.", "error"); }
       }));
@@ -511,8 +511,8 @@ async function renderAccount() {
         <section class="wrap page-head">
           <h2>Account</h2>
           <div class="card"><h3>Profile</h3><dl class="kv"><dt>Name</dt><dd>${esc(profile.fullName || "")}</dd></dl><dl class="kv"><dt>Code</dt><dd>${esc(profile.customerCode || "")}</dd></dl><dl class="kv"><dt>Email</dt><dd>${esc(profile.email || "")}</dd></dl><dl class="kv"><dt>Phone</dt><dd>${esc(profile.phoneNumber || "—")}</dd></dl></div>
-          <div class="card mt"><h3>Cash loan</h3><p class="small">Request a cash advance (demo).</p><form id="cash-form"><div class="grid-2"><div class="field"><label for="cl-amount">Amount (KES)</label><input id="cl-amount" type="number" min="1000" step="100" value="10000" /></div><div class="field"><label for="cl-rate">Monthly rate (%)</label><input id="cl-rate" type="number" min="0" step="0.5" value="4" /></div></div><div class="field"><label for="cl-purpose">Purpose</label><input id="cl-purpose" type="text" value="School fees" /></div><div class="btn-row"><button class="btn btn-primary" type="submit">Request cash loan</button></div></form></div>
-          ${cashLoans.length ? `<div class="card mt"><h3>Cash loans</h3><ul class="timeline">${cashLoans.map((cl) => `<li><div class="t-main"><div>${esc(cl.purpose || "")} · ${statusChip(cl.status)}</div><div class="t-sub">${esc(cl.customerName || "")} · ${esc(fmtDate(cl.createdAt))}</div></div><div class="t-amt">${money(cl.balanceRemaining)}</div></li>`).join("")}</ul></div>` : ""}
+          <div class="card mt"><h3>Quick loan</h3><p class="small">Request a small loan paid straight to your M-PESA (demo).</p><form id="cash-form"><div class="grid-2"><div class="field"><label for="cl-amount">Amount (KES)</label><input id="cl-amount" type="number" min="1000" step="100" value="10000" /></div><div class="field"><label for="cl-rate">Monthly rate (%)</label><input id="cl-rate" type="number" min="0" step="0.5" value="4" /></div></div><div class="field"><label for="cl-purpose">Purpose</label><input id="cl-purpose" type="text" value="School fees" /></div><div class="btn-row"><button class="btn btn-primary" type="submit">Request cash loan</button></div></form></div>
+          ${cashLoans.length ? `<div class="card mt"><h3>Quick loans</h3><ul class="timeline">${cashLoans.map((cl) => `<li><div class="t-main"><div>${esc(cl.purpose || "")} · ${statusChip(cl.status)}</div><div class="t-sub">${esc(cl.customerName || "")} · ${esc(fmtDate(cl.createdAt))}</div></div><div class="t-amt">${money(cl.balanceRemaining)}</div></li>`).join("")}</ul></div>` : ""}
           <div class="btn-row" style="margin-top:1rem"><button class="btn btn-secondary" id="signout-btn">Sign out</button><button class="btn btn-secondary" id="ussd-btn">USSD simulator</button></div>
           ${ussdOpen ? `<div class="card mt"><h3>USSD simulator <span class="chip chip-indigo rail-tag">Tracom: alternative banking channels</span></h3><div class="ussd-screen" aria-live="polite">${ussdLines.map((l) => esc(l)).join("\n")}</div><div class="ussd-input"><input id="ussd-input" type="text" placeholder="${esc(ussdInput)}" /><button class="btn btn-primary btn-sm" id="ussd-send">Send</button></div></div>` : ""}
         </section>`;
@@ -527,7 +527,7 @@ async function renderAccount() {
         e.preventDefault();
         try {
           await api("/cash-loans", { method: "POST", body: { amountRequested: Number(document.getElementById("cl-amount").value), monthlyRate: Number(document.getElementById("cl-rate").value), purpose: document.getElementById("cl-purpose").value.trim() } });
-          toast("Cash loan request submitted.", "success");
+          toast("Quick loan request submitted.", "success");
           renderAccount();
         } catch (err) { toast(err.message || "Could not request loan.", "error"); }
       });

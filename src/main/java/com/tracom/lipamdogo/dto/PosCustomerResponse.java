@@ -11,7 +11,6 @@ import java.util.List;
 public record PosCustomerResponse(
         String displayName,
         String maskedPhone,
-        String payerMsisdn,
         List<Contract> contracts
 ) {
     public record Contract(

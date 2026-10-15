@@ -19,6 +19,7 @@ const SECTIONS = [
   { id: "#/applications", label: "Applications", roles: ["ADMIN", "LOAN_OFFICER"] },
   { id: "#/customers", label: "Customers", roles: ["ADMIN", "LOAN_OFFICER"] },
   { id: "#/devices", label: "Devices", roles: ["ADMIN"] },
+  { id: "#/terminals", label: "Terminals", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
   { id: "#/catalog", label: "Catalog", roles: ["ADMIN"] },
   { id: "#/payments", label: "Payments", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
   { id: "#/reconciliation", label: "Reconciliation", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
@@ -32,6 +33,7 @@ const routes = {
   "#/applications": renderApplications,
   "#/customers": renderCustomers,
   "#/devices": renderDevices,
+  "#/terminals": renderTerminals,
   "#/catalog": renderCatalog,
   "#/payments": renderPayments,
   "#/reconciliation": renderReconciliation,
@@ -107,6 +109,12 @@ window.addEventListener("hashchange", route);
 const page = () => document.getElementById("page");
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+// Every payment is M-PESA; this says where it was started.
+function originLabel(tx) {
+  if (tx.origin === "AGENT_TERMINAL") return `Agent terminal <span class="mono">${esc(tx.terminalCode || "")}</span>`;
+  if (tx.origin === "BACK_OFFICE") return "Back office";
+  return "Customer app";
+}
 async function fetchWithFallback(path) {
   try { return await api(path); } catch { return null; }
 }
@@ -526,6 +534,100 @@ async function renderDeviceLock(device) {
   }
 }
 
+// ─── TERMINALS (terminal management) ─────────────────────────────────────────
+// The fleet of cashless agent terminals: who operates each one, whether it is
+// online (heartbeat in the last 5 minutes) and what it collected via M-PESA today.
+async function renderTerminals() {
+  page().innerHTML = `<section class="wrap page-head"><h2>Terminals</h2><div class="skeleton" style="height:300px;border-radius:18px"></div></section>`;
+  try {
+    const [terminals, merchants, agents] = await Promise.all([
+      api("/admin/terminals"),
+      can("ADMIN") ? api("/admin/merchants") : Promise.resolve([]),
+      can("ADMIN") ? api("/admin/agents") : Promise.resolve([]),
+    ]);
+    const online = terminals.filter((t) => t.online).length;
+    const inService = terminals.filter((t) => t.status === "ACTIVE").length;
+    const todayAmount = terminals.reduce((s, t) => s + Number(t.todayApprovedAmount || 0), 0);
+    const todayCount = terminals.reduce((s, t) => s + Number(t.todayApprovedCount || 0), 0);
+    const onlineChip = (t) => (t.online ? '<span class="chip chip-green">ONLINE</span>' : '<span class="chip chip-grey">OFFLINE</span>');
+    page().innerHTML = `
+      <section class="wrap page-head">
+        <div class="head-row"><h2>Terminals</h2>${can("ADMIN") ? `<button class="btn btn-primary btn-sm" id="add-terminal-btn">Register terminal</button>` : ""}</div>
+        <p class="small">Cashless agent terminals. Agents send M-PESA payment requests to customers' phones; no cash is taken at the counter.</p>
+        <div class="kpis">
+          <div class="kpi"><div class="k-label">Terminals</div><div class="k-value">${esc(String(terminals.length))}</div></div>
+          <div class="kpi"><div class="k-label">In service</div><div class="k-value">${esc(String(inService))}</div></div>
+          <div class="kpi"><div class="k-label">Online now</div><div class="k-value">${esc(String(online))}</div></div>
+          <div class="kpi"><div class="k-label">Collected today</div><div class="k-value">${money(todayAmount)}</div></div>
+          <div class="kpi"><div class="k-label">M-PESA payments today</div><div class="k-value">${esc(String(todayCount))}</div></div>
+          <div class="kpi"><div class="k-label">Faulty</div><div class="k-value">${esc(String(terminals.filter((t) => t.status === "FAULTY").length))}</div></div>
+        </div>
+        <div class="table-scroll mt"><table class="data"><thead><tr><th>Terminal</th><th>Merchant</th><th>Agent</th><th>Status</th><th>Online</th><th>Today</th><th>Last seen</th><th></th></tr></thead><tbody>
+          ${terminals.map((t) => `<tr class="clickable" data-terminal="${esc(String(t.id))}"><td class="mono">${esc(t.terminalCode)}</td><td>${esc(t.merchantName)}</td><td>${esc(t.agentName || "—")}</td><td>${statusChip(t.status)}</td><td>${onlineChip(t)}</td><td>${esc(String(t.todayApprovedCount))} · ${money(t.todayApprovedAmount)}</td><td>${esc(t.lastSeenAt ? fmtDateTime(t.lastSeenAt) : "Never")}</td><td><button class="btn btn-ghost btn-sm" data-terminal="${esc(String(t.id))}">View</button></td></tr>`).join("")}
+        </tbody></table></div>
+      </section>`;
+    document.querySelectorAll("[data-terminal]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); viewTerminal(terminals.find((t) => String(t.id) === el.dataset.terminal)); }));
+    document.getElementById("add-terminal-btn")?.addEventListener("click", () => {
+      openModal({ title: "Register terminal", bodyHTML: `<form id="term-form" novalidate>
+        <div class="field"><label for="t-serial">Serial number</label><input id="t-serial" data-field="serialNumber" type="text" placeholder="ING-M5K-24C0001" required /></div>
+        <div class="field"><label for="t-model">Model</label><input id="t-model" data-field="model" type="text" value="Ingenico Move/5000" required /></div>
+        <div class="field"><label for="t-merchant">Deployed at</label><select id="t-merchant">${merchants.map((m) => `<option value="${esc(String(m.id))}">${esc(m.businessName)}</option>`).join("")}</select></div>
+        <div class="btn-row"><button class="btn btn-primary" type="submit">Register</button></div></form>` });
+      document.getElementById("term-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          const t = await api("/admin/terminals", { method: "POST", body: { serialNumber: document.getElementById("t-serial").value.trim(), model: document.getElementById("t-model").value.trim(), merchantId: Number(document.getElementById("t-merchant").value) } });
+          toast(`Terminal ${t.terminalCode} registered.`, "success");
+          document.querySelector(".modal-close")?.click();
+          renderTerminals();
+        } catch (err) { setFieldErrors(document.getElementById("term-form"), err.fieldErrors); toast(err.message || "Failed.", "error"); }
+      });
+    });
+
+    async function viewTerminal(t) {
+      if (!t) return;
+      openDrawer(`Terminal ${t.terminalCode}`, '<div class="skeleton" style="height:220px"></div>');
+      const setBody = (html) => { const b = document.querySelector(".drawer-body"); if (b) b.innerHTML = html; };
+      try {
+        const txns = await api(`/admin/terminals/${t.id}/transactions`);
+        const sameMerchantAgents = agents.filter((a) => a.merchantId === t.merchantId && a.status === "ACTIVE");
+        setBody(`
+          <div style="margin-bottom:0.75rem">${statusChip(t.status)} ${onlineChip(t)}</div>
+          <div class="kv"><dt>Model</dt><dd>${esc(t.model)}</dd></div>
+          <div class="kv"><dt>Serial</dt><dd class="mono">${esc(t.serialNumber)}</dd></div>
+          <div class="kv"><dt>Merchant</dt><dd>${esc(t.merchantName)}</dd></div>
+          <div class="kv"><dt>Agent</dt><dd>${esc(t.agentName ? `${t.agentName} (${t.agentCode})` : "Unassigned")}</dd></div>
+          <div class="kv"><dt>App version</dt><dd class="mono">${esc(t.appVersion || "—")}</dd></div>
+          <div class="kv"><dt>Last seen</dt><dd>${esc(t.lastSeenAt ? fmtDateTime(t.lastSeenAt) : "Never")}</dd></div>
+          <div class="kv"><dt>Today</dt><dd>${esc(String(t.todayApprovedCount))} approved · ${money(t.todayApprovedAmount)} · ${esc(String(t.todayDeclinedCount))} declined</dd></div>
+          ${can("ADMIN") && t.status !== "RETIRED" ? `
+            <h3 class="mt">Manage</h3>
+            <div class="field"><label for="t-agent">Operator</label><select id="t-agent"><option value="">Unassigned</option>${sameMerchantAgents.map((a) => `<option value="${esc(String(a.id))}" ${a.id === t.agentId ? "selected" : ""}>${esc(a.fullName)} (${esc(a.agentCode)})</option>`).join("")}</select><p class="small">Only active agents of ${esc(t.merchantName)} can operate this terminal.</p></div>
+            <div class="field"><label for="t-status">Status</label><select id="t-status">${["ACTIVE", "SUSPENDED", "FAULTY", "RETIRED"].map((s) => `<option value="${s}" ${s === t.status ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+            <div class="btn-row"><button class="btn btn-primary btn-sm" id="t-save">Save changes</button></div>` : ""}
+          <h3 class="mt">Recent M-PESA collections</h3>
+          ${txns.length ? `<div class="table-scroll"><table class="data"><thead><tr><th>When</th><th>Contract</th><th>Amount</th><th>Status</th></tr></thead><tbody>${txns.slice(0, 15).map((x) => `<tr><td>${esc(fmtDateTime(x.requestedAt))}</td><td class="mono">${esc(x.contractNumber || "")}</td><td>${money(x.amount)}</td><td>${statusChip(x.status)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="small">No collections yet.</p>`}`);
+        document.getElementById("t-save")?.addEventListener("click", async () => {
+          const agentId = document.getElementById("t-agent").value;
+          const status = document.getElementById("t-status").value;
+          try {
+            if (status !== t.status) await api(`/admin/terminals/${t.id}/status`, { method: "PATCH", body: { status } });
+            if (status !== "RETIRED" && String(t.agentId ?? "") !== agentId) {
+              if (agentId) await api(`/admin/terminals/${t.id}/assign`, { method: "POST", body: { agentId: Number(agentId) } });
+              else await api(`/admin/terminals/${t.id}/unassign`, { method: "POST" });
+            }
+            toast(`Terminal ${t.terminalCode} updated.`, "success");
+            document.querySelector(".modal-close")?.click();
+            renderTerminals();
+          } catch (e) { toast(e.message || "Update failed.", "error"); }
+        });
+      } catch (e) { setBody(`<div class="form-error">${esc(e.message || "Unable to load terminal.")}</div>`); }
+    }
+  } catch (err) {
+    page().innerHTML = `<section class="wrap page-head"><div class="form-error">${esc(err.message || "Unable to load terminals.")}</div></section>`;
+  }
+}
+
 // ─── CATALOG (d2) ────────────────────────────────────────────────────────────
 async function renderCatalog() {
   page().innerHTML = `<section class="wrap page-head"><h2>Catalog</h2><div class="skeleton" style="height:300px;border-radius:18px"></div></section>`;
@@ -591,7 +693,7 @@ async function renderPayments(opts = {}) {
           <h2>Payments</h2>
           <p class="small">Only POSTED payments change contract balances. PENDING payments need a provider result first, then posting. POSTED payments can be reversed with a reason.</p>
           <div class="toolbar"><div class="field"><label for="pay-filter">Status</label><select id="pay-filter"><option value="">All</option><option value="PENDING" ${statusF === "PENDING" ? "selected" : ""}>Pending</option><option value="SUCCESS" ${statusF === "SUCCESS" ? "selected" : ""}>Success</option><option value="POSTED" ${statusF === "POSTED" ? "selected" : ""}>Posted</option><option value="FAILED" ${statusF === "FAILED" ? "selected" : ""}>Failed</option><option value="REVERSED" ${statusF === "REVERSED" ? "selected" : ""}>Reversed</option></select></div></div>
-          ${txns.length === 0 ? emptyState("No payments", "Transactions will appear here.") : `<div class="table-scroll"><table class="data"><thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>Channel</th><th>Status</th><th>Provider ref</th><th></th></tr></thead><tbody>${txns.map((tx) => `<tr class="clickable" data-tx="${esc(tx.transactionReference || "")}"><td class="mono">${esc(tx.transactionReference || "")}</td><td>${esc(tx.customerName || "")}</td><td>${money(tx.amount)}</td><td>${esc(tx.channel || "")}</td><td>${statusChip(tx.status)}</td><td class="mono">${esc(tx.providerReference || "—")}</td><td class="mono">${tx.status === "POSTED" ? esc(tx.receiptNumber || "") : `<span class="btn-row" style="margin:0">${tx.status === "PENDING" && role === "ADMIN" ? `<button class="btn btn-ghost btn-sm" data-resolve="${esc(tx.transactionReference || "")}">Resolve</button>` : ""}${(tx.status === "PENDING" || tx.status === "SUCCESS") && (role === "ADMIN" || role === "PAYMENTS_OPERATOR") ? `<button class="btn btn-ghost btn-sm" data-post="${esc(tx.transactionReference || "")}">Post</button>` : ""}${tx.status === "POSTED" && (role === "ADMIN" || role === "PAYMENTS_OPERATOR") ? `<button class="btn btn-ghost btn-sm" data-reverse="${esc(tx.transactionReference || "")}">Reverse</button>` : ""}</span>`}</td></tr>`).join("")}</tbody></table></div>`}
+          ${txns.length === 0 ? emptyState("No payments", "Transactions will appear here.") : `<div class="table-scroll"><table class="data"><thead><tr><th>Reference</th><th>Customer</th><th>Amount</th><th>M-PESA via</th><th>Status</th><th>Provider ref</th><th></th></tr></thead><tbody>${txns.map((tx) => `<tr class="clickable" data-tx="${esc(tx.transactionReference || "")}"><td class="mono">${esc(tx.transactionReference || "")}</td><td>${esc(tx.customerName || "")}</td><td>${money(tx.amount)}</td><td>${originLabel(tx)}</td><td>${statusChip(tx.status)}</td><td class="mono">${esc(tx.providerReference || "—")}</td><td class="mono">${tx.status === "POSTED" ? esc(tx.receiptNumber || "") : `<span class="btn-row" style="margin:0">${tx.status === "PENDING" && role === "ADMIN" ? `<button class="btn btn-ghost btn-sm" data-resolve="${esc(tx.transactionReference || "")}">Resolve</button>` : ""}${(tx.status === "PENDING" || tx.status === "SUCCESS") && (role === "ADMIN" || role === "PAYMENTS_OPERATOR") ? `<button class="btn btn-ghost btn-sm" data-post="${esc(tx.transactionReference || "")}">Post</button>` : ""}${tx.status === "POSTED" && (role === "ADMIN" || role === "PAYMENTS_OPERATOR") ? `<button class="btn btn-ghost btn-sm" data-reverse="${esc(tx.transactionReference || "")}">Reverse</button>` : ""}</span>`}</td></tr>`).join("")}</tbody></table></div>`}
         </section>`;
       document.getElementById("pay-filter").addEventListener("change", async (e) => { statusF = e.target.value; txns = await load(); render(); });
       document.querySelectorAll("tr[data-tx]").forEach((row) => row.addEventListener("click", (e) => {
@@ -663,7 +765,9 @@ async function renderPayments(opts = {}) {
           <div class="kv"><dt>Amount</dt><dd>${money(tx.amount)}</dd></div>
           <div class="kv"><dt>Customer</dt><dd>${esc(tx.customerName || "")} <span class="mono">${esc(tx.customerCode || "")}</span></dd></div>
           <div class="kv"><dt>Contract</dt><dd class="mono">${esc(tx.contractNumber || "")}</dd></div>
-          <div class="kv"><dt>Channel</dt><dd>${esc(tx.channel || "")}</dd></div>
+          <div class="kv"><dt>Paid by</dt><dd>M-PESA · ${originLabel(tx)}</dd></div>
+          ${tx.agentName ? `<div class="kv"><dt>Agent</dt><dd>${esc(tx.agentName)}</dd></div>` : ""}
+          ${tx.payerMsisdn ? `<div class="kv"><dt>Prompt sent to</dt><dd class="mono">${esc(tx.payerMsisdn)}</dd></div>` : ""}
           <div class="kv"><dt>Provider ref</dt><dd class="mono">${esc(tx.providerReference || "—")}</dd></div>
           ${tx.failureReason ? `<div class="kv"><dt>Failure reason</dt><dd>${esc(tx.failureReason)}</dd></div>` : ""}
           ${tx.status === "REVERSED" ? `<div class="kv"><dt>Reversal</dt><dd>${esc(tx.reversalReason || "reversed")}</dd></div>` : ""}

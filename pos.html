@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Terminal — M-Simu Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body class="sim-body">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="partner.html" aria-label="Back to partner portal">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">Agent terminal</span>
+      </a>
+      <span class="topbar-spa"></span>
+      <span class="chip chip-green">Cashless · M-PESA only</span>
+    </div>
+  </header>
+
+  <main class="wrap pos-layout">
+    <section class="pos-stage" aria-label="Payment terminal">
+      <div class="pos-device">
+        <div class="pos-brandline"><span>M-SIMU POS</span><span id="pos-tid">TRM-····</span></div>
+        <div class="pos-screen" id="pos-screen" aria-live="polite"></div>
+        <div class="pos-keypad" id="pos-keypad" aria-label="Terminal keypad">
+          <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+          <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+          <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+          <button type="button" data-k="cancel" class="k-red" aria-label="Cancel">✕</button>
+          <button type="button" data-k="0">0</button>
+          <button type="button" data-k="clear" class="k-yellow" aria-label="Clear">⌫</button>
+          <button type="button" data-k="enter" class="k-green k-wide" aria-label="Enter">OK</button>
+        </div>
+        <div class="pos-model">Ingenico Move/5000 (simulated)</div>
+      </div>
+    </section>
+
+    <aside class="pos-side">
+      <div class="card" id="pos-help">
+        <h3>How agent collections work</h3>
+        <p class="small">No cash changes hands. The agent finds the customer and sends an <strong>M-PESA payment request</strong> to their phone. The customer checks the amount and approves it with their <strong>own M-PESA PIN</strong>. The money goes straight to the business's M-PESA account, and the terminal prints a receipt with the phone's new unlock code.</p>
+        <p class="small">Keys: number keys, <strong>OK</strong> to confirm, <strong>⌫</strong> to delete, <strong>✕</strong> to go back. Your keyboard works too.</p>
+      </div>
+      <div class="card" id="customer-phone-card"></div>
+      <div id="slip-slot"></div>
+    </aside>
+  </main>
+
+  <script type="module" src="js/pos.js"></script>
+</body>
+</html>
