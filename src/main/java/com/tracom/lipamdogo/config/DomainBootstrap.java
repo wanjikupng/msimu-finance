@@ -8,11 +8,14 @@ import com.tracom.lipamdogo.model.Merchant;
 import com.tracom.lipamdogo.model.MerchantStatus;
 import com.tracom.lipamdogo.model.Product;
 import com.tracom.lipamdogo.model.Role;
+import com.tracom.lipamdogo.model.Terminal;
+import com.tracom.lipamdogo.model.TerminalStatus;
 import com.tracom.lipamdogo.model.UserAccount;
 import com.tracom.lipamdogo.repository.AgentRepository;
 import com.tracom.lipamdogo.repository.DeviceRepository;
 import com.tracom.lipamdogo.repository.MerchantRepository;
 import com.tracom.lipamdogo.repository.ProductRepository;
+import com.tracom.lipamdogo.repository.TerminalRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,7 @@ public class DomainBootstrap implements ApplicationRunner {
     private final AgentRepository agentRepository;
     private final DeviceRepository deviceRepository;
     private final ProductRepository productRepository;
+    private final TerminalRepository terminalRepository;
     private final PasswordEncoder passwordEncoder;
     private final String agentPassword;
     private final String merchantPassword;
@@ -51,6 +55,7 @@ public class DomainBootstrap implements ApplicationRunner {
                            AgentRepository agentRepository,
                            DeviceRepository deviceRepository,
                            ProductRepository productRepository,
+                           TerminalRepository terminalRepository,
                            PasswordEncoder passwordEncoder,
                            @Value("${app.bootstrap.agent.password:Agent@1234}") String agentPassword,
                            @Value("${app.bootstrap.merchant.password:Merchant@1234}") String merchantPassword) {
@@ -59,6 +64,7 @@ public class DomainBootstrap implements ApplicationRunner {
         this.agentRepository = agentRepository;
         this.deviceRepository = deviceRepository;
         this.productRepository = productRepository;
+        this.terminalRepository = terminalRepository;
         this.passwordEncoder = passwordEncoder;
         this.agentPassword = agentPassword;
         this.merchantPassword = merchantPassword;
@@ -89,7 +95,7 @@ public class DomainBootstrap implements ApplicationRunner {
                 MerchantStatus.ACTIVE, techPointOwner);
 
         Agent aminaAgent = ensureAgent("AGT-00001", amina, quickMart);
-        ensureAgent("AGT-00002", brian, quickMart);
+        Agent brianAgent = ensureAgent("AGT-00002", brian, quickMart);
         Agent faithAgent = ensureAgent("AGT-00003", faith, techPoint);
 
         Product a15 = productRepository.findByName("Samsung Galaxy A15").orElseThrow();
@@ -114,7 +120,15 @@ public class DomainBootstrap implements ApplicationRunner {
         ensureDevice("TRC-000135", "354411098765449", "TRC-TSP-010-000135", spark,
                 DeviceStatus.ASSIGNED, techPoint, faithAgent, null);
 
-        log.info("Domain seed ready: 2 merchants, 3 agents, 7 devices.");
+        // Cashless agent terminals: agents send M-PESA prompts from these;
+        // no cash is ever taken at the counter.
+        ensureTerminal("TRM-0001", "ING-M5K-24A0193", quickMart, aminaAgent, TerminalStatus.ACTIVE);
+        ensureTerminal("TRM-0002", "ING-M5K-24A0207", quickMart, brianAgent, TerminalStatus.ACTIVE);
+        ensureTerminal("TRM-0003", "ING-M5K-24B0011", techPoint, faithAgent, TerminalStatus.ACTIVE);
+        ensureTerminal("TRM-0004", "ING-M5K-24B0042", quickMart, null, TerminalStatus.ACTIVE);
+        ensureTerminal("TRM-0005", "ING-M5K-23C0880", techPoint, null, TerminalStatus.FAULTY);
+
+        log.info("Domain seed ready: 2 merchants, 3 agents, 7 devices, 5 terminals.");
     }
 
     private UserAccount ensureUser(String fullName, String email, String phone,
@@ -167,5 +181,17 @@ public class DomainBootstrap implements ApplicationRunner {
         device.setAgent(agent);
         device.setCustomer(customer);
         deviceRepository.save(device);
+    }
+
+    private void ensureTerminal(String code, String serial, Merchant merchant, Agent agent, TerminalStatus status) {
+        Terminal terminal = new Terminal();
+        terminal.setTerminalCode(code);
+        terminal.setSerialNumber(serial);
+        terminal.setModel("Ingenico Move/5000");
+        terminal.setMerchant(merchant);
+        terminal.setAgent(agent);
+        terminal.setStatus(status);
+        terminal.setAppVersion("msimu-pos 1.0.0");
+        terminalRepository.save(terminal);
     }
 }

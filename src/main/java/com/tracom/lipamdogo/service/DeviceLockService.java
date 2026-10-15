@@ -137,6 +137,12 @@ public class DeviceLockService {
                 latest(key));
     }
 
+    /** The code a specific payment produced, if it moved the paid-through date. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<UnlockCodeResponse> codeIssuedFor(Long paymentTransactionId) {
+        return codeRepository.findFirstByPaymentTransactionId(paymentTransactionId).map(UnlockCodeResponse::from);
+    }
+
     /** What the device shows today once it holds the latest code. */
     public DeviceLockState stateOf(LoanContract contract) {
         if (contract.getStatus() == LoanStatus.PAID_OFF) {

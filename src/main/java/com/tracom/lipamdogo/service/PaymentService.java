@@ -4,12 +4,15 @@ import com.tracom.lipamdogo.dto.PaymentAllocationResponse;
 import com.tracom.lipamdogo.dto.PaymentInitiateRequest;
 import com.tracom.lipamdogo.dto.PaymentTransactionResponse;
 import com.tracom.lipamdogo.dto.ReceiptResponse;
+import com.tracom.lipamdogo.model.Agent;
 import com.tracom.lipamdogo.model.LoanContract;
 import com.tracom.lipamdogo.model.LoanStatus;
 import com.tracom.lipamdogo.model.PaymentChannel;
+import com.tracom.lipamdogo.model.PaymentOrigin;
 import com.tracom.lipamdogo.model.PaymentTransaction;
 import com.tracom.lipamdogo.model.PaymentTransactionStatus;
 import com.tracom.lipamdogo.model.Role;
+import com.tracom.lipamdogo.model.Terminal;
 import com.tracom.lipamdogo.model.UserAccount;
 import com.tracom.lipamdogo.payment.MockProviderScenario;
 import com.tracom.lipamdogo.payment.PaymentProvider;
@@ -113,6 +116,71 @@ public class PaymentService {
             }
         }
 
+        PaymentOrigin origin = principal.getRole() == Role.CUSTOMER
+                ? PaymentOrigin.CUSTOMER_APP
+                : PaymentOrigin.BACK_OFFICE;
+        return send(contract, request.amount(), request.channel(),
+                request.mockScenario() == null ? MockProviderScenario.AUTO : request.mockScenario(),
+                idempotencyKey, origin, null, null, null);
+    }
+
+    /**
+     * Agent-assisted M-PESA collection from a POS terminal. The provider is
+     * asked to send a payment prompt (STK push) to the customer's phone; the
+     * transaction stays PENDING until the customer approves or declines with
+     * their M-PESA PIN ({@link #completeStkPush}). The agent never handles
+     * money and never sees the customer's PIN.
+     */
+    @Transactional
+    public PaymentTransactionResponse initiateAtTerminal(Terminal terminal, Agent agent, Long contractId,
+                                                         BigDecimal amount, String payerMsisdn,
+                                                         String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            PaymentTransaction existing = transactionRepository.findByIdempotencyKey(idempotencyKey.trim())
+                    .orElse(null);
+            if (existing != null) {
+                assertSameTerminalIntent(existing, terminal, contractId, amount);
+                return toResponse(existing);
+            }
+        }
+        LoanContract contract = loanContractRepository.findByIdForUpdate(contractId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Financing contract not found."));
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            PaymentTransaction raced = transactionRepository.findByIdempotencyKey(idempotencyKey.trim())
+                    .orElse(null);
+            if (raced != null) {
+                assertSameTerminalIntent(raced, terminal, contractId, amount);
+                return toResponse(raced);
+            }
+        }
+        return send(contract, amount, PaymentChannel.MPESA, MockProviderScenario.PENDING, idempotencyKey,
+                PaymentOrigin.AGENT_TERMINAL, terminal, agent, payerMsisdn);
+    }
+
+    /**
+     * Outcome of an STK push, as the M-PESA callback would report it: the
+     * customer approved (SUCCESS, posted immediately like any synchronous
+     * settlement) or declined / let it time out (FAILED, reservation released,
+     * nothing applied).
+     */
+    @Transactional
+    public PaymentTransactionResponse completeStkPush(String reference, boolean approved, String failureReason) {
+        applyProviderResult(reference, approved ? ProviderOutcome.SUCCESS : ProviderOutcome.FAILED,
+                approved ? null : failureReason);
+        PaymentTransaction transaction = transactionRepository.findByTransactionReference(reference).orElseThrow();
+        String receiptNumber = null;
+        if (approved) {
+            receiptNumber = postingService.post(reference).receiptNumber();
+        } else {
+            postingService.refreshLoanState(transaction.getContract());
+        }
+        return toResponse(transactionRepository.findById(transaction.getId()).orElseThrow(), receiptNumber);
+    }
+
+    private PaymentTransactionResponse send(LoanContract contract, BigDecimal amount, PaymentChannel channel,
+                                            MockProviderScenario scenario, String idempotencyKey,
+                                            PaymentOrigin origin, Terminal terminal, Agent agent,
+                                            String payerMsisdn) {
         if (contract.getStatus() != LoanStatus.ACTIVE && contract.getStatus() != LoanStatus.OVERDUE) {
             throw new IllegalArgumentException(
                     "Payments are only accepted on ACTIVE or OVERDUE contracts (current: " + contract.getStatus() + ").");
@@ -132,9 +200,9 @@ public class PaymentService {
                     "A previous payment of KES " + reserved.stripTrailingZeros().toPlainString()
                             + " is still being processed. Please wait for it to complete before making another payment.");
         }
-        if (request.amount().compareTo(available) > 0) {
+        if (amount.compareTo(available) > 0) {
             if (reserved.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Payment of KES " + request.amount()
+                throw new IllegalArgumentException("Payment of KES " + amount
                         + " exceeds the outstanding balance of KES " + contract.getAmountRemaining() + ".");
             }
             throw new IllegalArgumentException(
@@ -145,14 +213,18 @@ public class PaymentService {
                             + available.stripTrailingZeros().toPlainString() + " or less.");
         }
 
-        PaymentProvider provider = providerRegistry.require(request.channel());
+        PaymentProvider provider = providerRegistry.require(channel);
         UserAccount customer = contract.getCustomer();
 
         PaymentTransaction transaction = new PaymentTransaction();
         transaction.setContract(contract);
         transaction.setCustomer(customer);
-        transaction.setAmount(request.amount());
-        transaction.setChannel(request.channel());
+        transaction.setAmount(amount);
+        transaction.setChannel(channel);
+        transaction.setOrigin(origin);
+        transaction.setTerminal(terminal);
+        transaction.setAgent(agent);
+        transaction.setPayerMsisdn(payerMsisdn);
         transaction.setStatus(PaymentTransactionStatus.INITIATED);
         transaction.setIdempotencyKey(idempotencyKey == null || idempotencyKey.isBlank()
                 ? UUID.randomUUID().toString()
@@ -167,7 +239,7 @@ public class PaymentService {
                 saved.getAmount(),
                 contract.getId(),
                 customer.getId(),
-                request.mockScenario() == null ? MockProviderScenario.AUTO : request.mockScenario()));
+                scenario));
 
         applyProviderResult(saved, result);
         postingService.refreshLoanState(contract);
@@ -321,6 +393,18 @@ public class PaymentService {
         boolean same = existing.getContract().getId().equals(request.contractId())
                 && existing.getAmount().compareTo(request.amount()) == 0
                 && existing.getChannel() == request.channel();
+        if (!same) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Idempotency key was already used for a different payment.");
+        }
+    }
+
+    private void assertSameTerminalIntent(PaymentTransaction existing, Terminal terminal, Long contractId,
+                                          BigDecimal amount) {
+        boolean same = existing.getTerminal() != null
+                && existing.getTerminal().getId().equals(terminal.getId())
+                && existing.getContract().getId().equals(contractId)
+                && existing.getAmount().compareTo(amount) == 0;
         if (!same) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Idempotency key was already used for a different payment.");

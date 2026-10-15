@@ -10,6 +10,7 @@ DELETE FROM loan_contracts;
 DELETE FROM financing_applications;
 DELETE FROM cash_loans;
 DELETE FROM devices;
+DELETE FROM terminals;
 DELETE FROM agents;
 DELETE FROM merchants;
 DELETE FROM payment_plans;
@@ -30,14 +31,14 @@ INSERT INTO payment_plans (plan_name, duration_days, deposit_amount, daily_amoun
 ('Standard 120 Days', 120, 4000.00, 117.00),
 ('Fast 90 Days', 90, 4000.00, 156.00);
 
+-- Cashless platform: every repayment moves over M-PESA, whether the customer
+-- pays from their own phone or an agent sends the prompt from a terminal.
 INSERT INTO payment_modes (mode_name, description) VALUES
-('M-PESA', 'Mobile money payment'),
-('Airtel Money', 'Airtel wallet transfer'),
-('Cash', 'Cash payment in-store');
+('M-PESA', 'M-PESA payment (customer app or agent-initiated STK push)');
 
 INSERT INTO products (name, description, full_price, down_payment, daily_amount, payment_plan_name, payment_mode) VALUES
 ('Samsung Galaxy A15', '6.5" display • 128GB storage', 18000.00, 4000.00, 70.00, 'Flex 200 Days', 'M-PESA'),
-('Tecno Camon 20', 'AI camera • 256GB memory', 22000.00, 5000.00, 90.00, 'Standard 120 Days', 'Airtel Money'),
-('Infinix Hot 40', 'Large battery • dual camera', 16000.00, 3500.00, 60.00, 'Flex 200 Days', 'Cash'),
+('Tecno Camon 20', 'AI camera • 256GB memory', 22000.00, 5000.00, 90.00, 'Standard 120 Days', 'M-PESA'),
+('Infinix Hot 40', 'Large battery • dual camera', 16000.00, 3500.00, 60.00, 'Flex 200 Days', 'M-PESA'),
 ('Redmi 14C', '6.88" display • 128GB storage', 15000.00, 3000.00, 55.00, 'Flex 200 Days', 'M-PESA'),
-('Tecno Spark 10', '50MP camera • 128GB memory', 14000.00, 3000.00, 50.00, 'Standard 120 Days', 'Cash');
+('Tecno Spark 10', '50MP camera • 128GB memory', 14000.00, 3000.00, 50.00, 'Standard 120 Days', 'M-PESA');

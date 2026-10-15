@@ -28,6 +28,14 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     List<PaymentTransaction> findAllByStatus(PaymentTransactionStatus status);
 
+    List<PaymentTransaction> findAllByTerminalIdOrderByRequestedAtDesc(Long terminalId);
+
+    List<PaymentTransaction> findAllByTerminalIdAndRequestedAtBetweenOrderByRequestedAtDesc(
+            Long terminalId, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
+    List<PaymentTransaction> findAllByAgentIdAndRequestedAtBetweenOrderByRequestedAtDesc(
+            Long agentId, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     List<PaymentTransaction> findAllByContractIdAndStatus(Long contractId, PaymentTransactionStatus status);
 
     /**

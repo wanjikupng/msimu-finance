@@ -86,6 +86,23 @@ public class PaymentTransaction {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origin", nullable = false)
+    private PaymentOrigin origin = PaymentOrigin.CUSTOMER_APP;
+
+    /** Set when an agent started the payment from a POS terminal. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "terminal_id")
+    private Terminal terminal;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agent_id")
+    private Agent agent;
+
+    /** M-PESA number the payment prompt was sent to (terminal payments). */
+    @Column(name = "payer_msisdn")
+    private String payerMsisdn;
+
     public PaymentTransaction() {
         this.requestedAt = SystemTime.now();
         this.createdAt = SystemTime.now();
@@ -234,5 +251,37 @@ public class PaymentTransaction {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public PaymentOrigin getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(PaymentOrigin origin) {
+        this.origin = origin;
+    }
+
+    public Terminal getTerminal() {
+        return terminal;
+    }
+
+    public void setTerminal(Terminal terminal) {
+        this.terminal = terminal;
+    }
+
+    public Agent getAgent() {
+        return agent;
+    }
+
+    public void setAgent(Agent agent) {
+        this.agent = agent;
+    }
+
+    public String getPayerMsisdn() {
+        return payerMsisdn;
+    }
+
+    public void setPayerMsisdn(String payerMsisdn) {
+        this.payerMsisdn = payerMsisdn;
     }
 }

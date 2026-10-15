@@ -11,4 +11,6 @@ public interface UnlockCodeRepository extends JpaRepository<UnlockCode, Long> {
     Optional<UnlockCode> findFirstByLockKeyIdOrderBySequenceDesc(Long lockKeyId);
 
     List<UnlockCode> findAllByLockKeyIdOrderBySequenceDesc(Long lockKeyId);
+
+    Optional<UnlockCode> findFirstByPaymentTransactionId(Long paymentTransactionId);
 }

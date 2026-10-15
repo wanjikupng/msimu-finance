@@ -1,6 +1,7 @@
 package com.tracom.lipamdogo.dto;
 
 import com.tracom.lipamdogo.model.PaymentChannel;
+import com.tracom.lipamdogo.model.PaymentOrigin;
 import com.tracom.lipamdogo.model.PaymentTransaction;
 import com.tracom.lipamdogo.model.PaymentTransactionStatus;
 
@@ -23,7 +24,11 @@ public record PaymentTransactionResponse(
         LocalDateTime postedAt,
         String receiptNumber,
         BigDecimal remainingBalance,
-        String reversalReason
+        String reversalReason,
+        PaymentOrigin origin,
+        String terminalCode,
+        String agentName,
+        String payerMsisdn
 ) {
     public static PaymentTransactionResponse from(PaymentTransaction transaction, String receiptNumber) {
         return new PaymentTransactionResponse(
@@ -42,7 +47,19 @@ public record PaymentTransactionResponse(
                 transaction.getPostedAt(),
                 receiptNumber,
                 transaction.getContract().getAmountRemaining(),
-                transaction.getReversalReason()
+                transaction.getReversalReason(),
+                transaction.getOrigin(),
+                transaction.getTerminal() == null ? null : transaction.getTerminal().getTerminalCode(),
+                transaction.getAgent() == null ? null : transaction.getAgent().getUserAccount().getFullName(),
+                maskMsisdn(transaction.getPayerMsisdn())
         );
+    }
+
+    /** 254712345678 → 2547*****678: enough to recognise, not enough to reuse. */
+    public static String maskMsisdn(String msisdn) {
+        if (msisdn == null || msisdn.length() < 7) {
+            return msisdn;
+        }
+        return msisdn.substring(0, 4) + "*".repeat(msisdn.length() - 7) + msisdn.substring(msisdn.length() - 3);
     }
 }
