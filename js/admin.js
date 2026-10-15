@@ -2,7 +2,7 @@
 // payments, network, reports. Role-gated sidebar shows only permitted sections.
 // Every string injected into HTML goes through esc(); no customer-only endpoints.
 import { api, requireRole, signOut } from "./api.js";
-import { esc, money, fmtDate, fmtDateTime, skeletonRows, emptyState, statusChip, toast, confirmDialog, openModal, openDrawer, setFieldErrors } from "./ui.js";
+import { esc, money, fmtDate, fmtDateTime, skeletonRows, emptyState, statusChip, toast, confirmDialog, openModal, openDrawer, setFieldErrors, dueLabel } from "./ui.js";
 
 // ─── guards ───────────────────────────────────────────────────────────────────
 const ALLOWED = ["ADMIN", "LOAN_OFFICER", "PAYMENTS_OPERATOR"];
@@ -51,6 +51,12 @@ function renderNav() {
       el.innerHTML = visibleSections().map((n) => `<a href="${n.id}" aria-current="${n.id === current ? "page" : "false"}">${esc(n.label)}</a>`).join("");
     }
   }
+}
+
+// Mirrors the backend @PreAuthorize rules so a page never asks for data the
+// signed-in role cannot read (which would only produce 403 noise).
+function can(...roles) {
+  return roles.includes(role);
 }
 
 function visibleSections() {
@@ -114,11 +120,11 @@ async function renderOverview() {
   page().innerHTML = `<section class="wrap page-head"><h2>Overview</h2><div class="kpis">${Array(6).fill('<div class="kpi"><div class="skeleton" style="height:2.5rem"></div></div>').join("")}</div><div class="grid-2 mt" style="gap:1rem"><div class="card"><div class="skeleton" style="height:200px"></div></div><div class="card"><div class="skeleton" style="height:200px"></div></div></div></section>`;
   try {
     const [apps, contracts, devices, payments, reconRecords] = await Promise.all([
-      fetchWithFallback("/admin/financing/applications/summary"),
-      fetchWithFallback("/loans"),
-      fetchWithFallback("/admin/devices"),
-      fetchWithFallback("/admin/payments"),
-      fetchWithFallback("/admin/reconciliation/records"),
+      can("ADMIN", "LOAN_OFFICER") ? fetchWithFallback("/admin/financing/applications/summary") : null,
+      can("ADMIN", "LOAN_OFFICER") ? fetchWithFallback("/loans") : null,
+      can("ADMIN") ? fetchWithFallback("/admin/devices") : null,
+      can("ADMIN", "PAYMENTS_OPERATOR") ? fetchWithFallback("/admin/payments") : null,
+      can("ADMIN", "PAYMENTS_OPERATOR") ? fetchWithFallback("/admin/reconciliation/records") : null,
     ]);
     const activeContracts = (Array.isArray(contracts) ? contracts : []).filter((c) => c.loanStatus === "ACTIVE");
     const overdueContracts = (Array.isArray(contracts) ? contracts : []).filter((c) => c.loanStatus === "OVERDUE");
@@ -150,7 +156,7 @@ async function renderOverview() {
 
     // Needs attention — every item deep-links to the filtered tab and,
     // where it names a single record, auto-opens its detail drawer.
-    const overdueItems = overdueContracts.map((c) => ({ text: `${esc(c.customerName || "")} · ${esc(c.productName || "")} ${esc(String(Math.ceil(Math.max(0, (new Date() - new Date(c.nextPaymentDueDate)) / 86400000))))} days late`, href: `#/customers`, open: c.customerId != null ? { section: "#/customers", open: String(c.customerId) } : null }));
+    const overdueItems = overdueContracts.map((c) => ({ text: `${esc(c.customerName || "")} · ${esc(c.productName || "")} · ${esc(dueLabel(c.nextPaymentDueDate))}`, href: `#/customers`, open: c.customerId != null ? { section: "#/customers", open: String(c.customerId) } : null }));
     const pendingApps = apps && apps.submitted + apps.underReview > 0 ? [
       { text: `${apps.submitted + apps.underReview} applications pending review`, href: "#/applications?status=SUBMITTED", open: null },
     ] : [];
@@ -167,13 +173,13 @@ async function renderOverview() {
 
     page().innerHTML = `
       <section class="wrap page-head">
-        <h2>Overview</h2>
+        <div class="head-row"><h2>Overview</h2><button class="btn btn-secondary btn-sm" id="eod-btn" title="Re-checks every live contract against today's date">Run end-of-day</button></div>
         <div class="kpis">
           <div class="kpi"><div class="k-label">Active contracts</div><div class="k-value">${esc(String(activeContracts.length))}</div></div>
           <div class="kpi"><div class="k-label">Overdue contracts</div><div class="k-value">${esc(String(overdueContracts.length))}</div></div>
           <div class="kpi"><div class="k-label">Outstanding balance</div><div class="k-value">${money(outstandingBalance)}</div></div>
-          <div class="kpi"><div class="k-label">Collected today</div><div class="k-value">${money(collectedToday)}</div></div>
-          <div class="kpi"><div class="k-label">Total collected</div><div class="k-value">${money(collectedTotal)}</div></div>
+          <div class="kpi"><div class="k-label">Collected today</div><div class="k-value">${payments ? money(collectedToday) : "—"}</div></div>
+          <div class="kpi"><div class="k-label">Total collected</div><div class="k-value">${payments ? money(collectedTotal) : "—"}</div></div>
           <div class="kpi"><div class="k-label">Portfolio at risk</div><div class="k-value">${esc(String(riskPct))}%</div></div>
         </div>
         <div class="grid-2 mt" style="gap:1rem">
@@ -189,7 +195,7 @@ async function renderOverview() {
           </div>
           <div class="card">
             <h3>Device fleet</h3>
-            ${Array.isArray(devices) ? (() => {
+            ${!can("ADMIN") ? '<p class="small">Fleet detail is visible to administrators.</p>' : Array.isArray(devices) ? (() => {
               const counts = {};
               devices.forEach((d) => { const s = d.status || "UNKNOWN"; counts[s] = (counts[s] || 0) + 1; });
               const colors = { AVAILABLE: "#12B08A", ASSIGNED: "#4147D5", FINANCED: "#087A5D", OVERDUE: "#D2453D", PAID_OFF: "#4C6472", REPAIR: "#E39A0B", RESERVED: "#E39A0B", LOST: "#D2453D", RETIRED: "#4C6472" };
@@ -201,7 +207,7 @@ async function renderOverview() {
           </div>
           <div class="card" style="grid-column:1/-1">
             <h3>Collections — last 14 days</h3>
-            ${svgBars(days14)}
+            ${payments ? svgBars(days14) : '<p class="small">Collections are visible to administrators and payments staff.</p>'}
           </div>
           <div class="card" style="grid-column:1/-1">
             <h3>Needs attention</h3>
@@ -209,6 +215,15 @@ async function renderOverview() {
           </div>
         </div>
       </section>`;
+      document.getElementById("eod-btn")?.addEventListener("click", async () => {
+        const ok = await confirmDialog({ title: "Run end-of-day?", message: "Re-checks every live contract against today's date. Customers behind on payments become OVERDUE (and their device with them); customers who caught up return to ACTIVE. No money moves." });
+        if (!ok) return;
+        try {
+          const r = await api("/admin/operations/arrears-sweep", { method: "POST" });
+          toast(`End-of-day ${r.businessDate}: ${r.contractsChecked} checked, ${r.newlyOverdue} newly overdue, ${r.backToActive} back on track.`, "success");
+          renderOverview();
+        } catch (e) { toast(e.message || "End-of-day failed.", "error"); }
+      });
       document.querySelectorAll("[data-attn]").forEach((el) => el.addEventListener("click", () => {
         const all = [...overdueItems, ...pendingApps, ...pendingPayments, ...exceptionItems, ...repairItems].slice(0, 8);
         const item = all[Number(el.dataset.attn)];
@@ -252,6 +267,7 @@ async function renderApplications(opts = {}) {
         <div class="kv"><dt>IMEI</dt><dd class="mono">${esc(app.imeiMasked || "—")}</dd></div>
         <div class="kv"><dt>Deposit</dt><dd>${money(app.depositAmount)}</dd></div>
         <div class="kv"><dt>Requested</dt><dd>${money(app.requestedPrincipal)}</dd></div>
+        ${app.installmentAmount != null ? `<div class="kv"><dt>Quoted installment</dt><dd>${money(app.installmentAmount)}/day</dd></div>` : ""}
         <div class="kv"><dt>Plan</dt><dd>${esc(app.paymentPlanName || "")}</dd></div>
         <div class="kv"><dt>Status</dt><dd>${statusChip(app.status)}</dd></div>
         ${app.reviewedByName ? `<div class="kv"><dt>Reviewer</dt><dd>${esc(app.reviewedByName)}</dd></div>` : ""}
@@ -657,6 +673,11 @@ async function renderReconciliation(opts = {}) {
       ]);
       return { batches, records };
     }
+    // The KPIs describe the whole latest picture; the table honours the filter
+    // ("" = every exception, i.e. everything except MATCHED).
+    function visibleRecords() {
+      return statusF ? records : records.filter((r) => r.status !== "MATCHED");
+    }
     let loaded = await load();
     let batches = loaded.batches;
     let records = loaded.records;
@@ -723,7 +744,8 @@ async function renderReconciliation(opts = {}) {
           </div>
           <div class="btn-row mt">
             <button class="btn btn-primary btn-sm" id="recon-run-btn">Run reconciliation</button>
-            <button class="btn btn-secondary btn-sm" id="recon-import-btn">Import provider feed</button>
+            <button class="btn btn-secondary btn-sm" id="recon-statement-btn">Fetch M-PESA statement (simulated)</button>
+            <button class="btn btn-ghost btn-sm" id="recon-import-btn">Paste feed JSON</button>
           </div>
           <div class="card mt"><h3>Runs</h3>
             <div id="recon-batches"></div>
@@ -742,10 +764,11 @@ async function renderReconciliation(opts = {}) {
       const labels = { "": "All non-matched", AMOUNT_MISMATCH: "Amount mismatch", STATUS_MISMATCH: "Status mismatch", MISSING_INTERNAL: "Missing internal", MISSING_PROVIDER: "Missing provider", DUPLICATE_PROVIDER: "Duplicate provider", MATCHED: "Matched" };
       filterSel.innerHTML = statuses.map((st) => `<option value="${st}"${statusF === st ? " selected" : ""}>${labels[st]}</option>`).join("");
       const tableSlot = document.getElementById("recon-table");
-      if (records.length === 0) {
-        tableSlot.innerHTML = emptyState("No exceptions", "Everything currently reconciles.");
+      const shown = visibleRecords();
+      if (shown.length === 0) {
+        tableSlot.innerHTML = emptyState(statusF ? "Nothing with this status" : "No exceptions", statusF ? "Try another filter." : "Everything currently reconciles.");
       } else {
-        tableSlot.innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th>Provider ref</th><th>Status</th><th>Internal</th><th>Provider amt</th><th>Internal amt</th><th>Difference</th><th>Reason</th></tr></thead><tbody>${records.map(reconRowHtml).join("")}</tbody></table></div>`;
+        tableSlot.innerHTML = `<div class="table-scroll"><table class="data"><thead><tr><th>Provider ref</th><th>Status</th><th>Internal</th><th>Provider amt</th><th>Internal amt</th><th>Difference</th><th>Reason</th></tr></thead><tbody>${shown.map(reconRowHtml).join("")}</tbody></table></div>`;
       }
       filterSel.addEventListener("change", async (e) => {
         statusF = e.target.value;
@@ -765,6 +788,7 @@ async function renderReconciliation(opts = {}) {
       }
       document.getElementById("recon-run-btn").addEventListener("click", runReconNow);
       document.getElementById("recon-import-btn").addEventListener("click", openFeedImport);
+      document.getElementById("recon-statement-btn").addEventListener("click", openStatementImport);
     }
     async function runReconNow() {
       const ok = await confirmDialog({ title: "Run reconciliation?", message: "Compares internal payments against the imported provider feed. Read-only." });
@@ -777,6 +801,20 @@ async function renderReconciliation(opts = {}) {
         records = loaded3.records;
         render();
       } catch (e) { toast(e.message || "Run failed.", "error"); }
+    }
+    function openStatementImport() {
+      openModal({ title: "Fetch M-PESA statement (simulated)", bodyHTML: `
+        <p class="small">A live integration would download Safaricom's settlement statement. Here the mock adapter produces the statement for every transaction it handled. Lines already imported are skipped.</p>
+        <div class="checkrow"><input type="checkbox" id="stmt-exceptions" /><label for="stmt-exceptions">Include two sample exceptions (an amount difference and an unknown paybill payment)</label></div>
+        <div class="btn-row"><button class="btn btn-primary btn-sm" id="stmt-confirm">Fetch statement</button></div>` });
+      document.getElementById("stmt-confirm")?.addEventListener("click", async () => {
+        const inject = document.getElementById("stmt-exceptions")?.checked ? "true" : "false";
+        try {
+          const result = await api(`/admin/reconciliation/feed/simulate?injectExceptions=${inject}`, { method: "POST" });
+          toast(`Statement: ${result.inserted} new lines, ${result.skippedDuplicates} already imported. Run reconciliation to compare.`, "success");
+          document.querySelector(".modal-close")?.click();
+        } catch (e) { toast(e.message || "Statement import failed.", "error"); }
+      });
     }
     function openFeedImport() {
       openModal({ title: "Import provider feed (simulated)", bodyHTML: `

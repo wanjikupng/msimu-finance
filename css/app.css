@@ -419,3 +419,6 @@ table.data tr.clickable { cursor: pointer; }
 .stat span { font-size: 0.78rem; color: var(--slate); }
 .stat strong { font-family: var(--font-head); font-size: 1.15rem; }
 .stat em { font-style: normal; font-size: 0.78rem; color: var(--muted); }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.head-row h2 { margin: 0; }
+.page-head > .head-row { margin-bottom: 0.75rem; }

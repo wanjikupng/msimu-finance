@@ -92,8 +92,6 @@ public class DomainBootstrap implements ApplicationRunner {
         ensureAgent("AGT-00002", brian, quickMart);
         Agent faithAgent = ensureAgent("AGT-00003", faith, techPoint);
 
-        UserAccount demoCustomer = userAccountRepository.findByEmail("demo@lipamdogo.com").orElse(null);
-
         Product a15 = productRepository.findByName("Samsung Galaxy A15").orElseThrow();
         Product redmi = productRepository.findByName("Redmi 14C").orElseThrow();
         Product spark = productRepository.findByName("Tecno Spark 10").orElseThrow();
@@ -102,8 +100,11 @@ public class DomainBootstrap implements ApplicationRunner {
                 DeviceStatus.AVAILABLE, null, null, null);
         ensureDevice("TRC-000130", "356938035643817", "TRC-SAM-A15-000130", a15,
                 DeviceStatus.ASSIGNED, quickMart, aminaAgent, null);
+        // Stock at QuickMart's counter, not yet with an agent. Financed devices
+        // are only ever created through the approval workflow (see
+        // DemoPortfolioBootstrap), so every FINANCED device has a contract.
         ensureDevice("TRC-000131", "356938035643825", "TRC-SAM-A15-000131", a15,
-                DeviceStatus.FINANCED, quickMart, null, demoCustomer);
+                DeviceStatus.AVAILABLE, quickMart, null, null);
         ensureDevice("TRC-000132", "867648022113452", "TRC-RED-14C-000132", redmi,
                 DeviceStatus.AVAILABLE, null, null, null);
         ensureDevice("TRC-000133", "867648022113460", "TRC-RED-14C-000133", redmi,

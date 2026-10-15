@@ -6,6 +6,7 @@ import com.tracom.lipamdogo.dto.ReconciliationBatchResponse;
 import com.tracom.lipamdogo.dto.ReconciliationRecordResponse;
 import com.tracom.lipamdogo.model.PaymentChannel;
 import com.tracom.lipamdogo.model.ReconciliationStatus;
+import com.tracom.lipamdogo.payment.ProviderStatementSimulator;
 import com.tracom.lipamdogo.service.ReconciliationService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -33,9 +34,23 @@ import java.util.List;
 public class ReconciliationAdminController {
 
     private final ReconciliationService reconciliationService;
+    private final ProviderStatementSimulator statementSimulator;
 
-    public ReconciliationAdminController(ReconciliationService reconciliationService) {
+    public ReconciliationAdminController(ReconciliationService reconciliationService,
+                                         ProviderStatementSimulator statementSimulator) {
         this.reconciliationService = reconciliationService;
+        this.statementSimulator = statementSimulator;
+    }
+
+    /**
+     * Imports the simulated M-PESA statement for every transaction the mock
+     * adapter handled (optionally with two sample exceptions). Stands in for
+     * the settlement file a live provider would send.
+     */
+    @PostMapping("/feed/simulate")
+    public ResponseEntity<ProviderFeedImportResponse> importSimulatedStatement(
+            @RequestParam(defaultValue = "false") boolean injectExceptions) {
+        return ResponseEntity.ok(statementSimulator.importMpesaStatement(injectExceptions));
     }
 
     @PostMapping("/feed")

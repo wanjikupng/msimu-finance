@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -119,6 +120,7 @@ public class FinancingService {
         application.setDevicePrice(terms.devicePrice());
         application.setDepositAmount(terms.depositAmount());
         application.setRequestedPrincipal(terms.requestedPrincipal());
+        application.setInstallmentAmount(terms.installmentAmount());
 
         FinancingApplication saved = applicationRepository.saveAndFlush(application);
         saved.setApplicationNumber(number("APP", saved.getId()));
@@ -246,7 +248,12 @@ public class FinancingService {
         contract.setDevice(device);
         contract.setApplication(application);
         contract.setDepositPaid(application.getDepositAmount());
-        contract.setDailyAmount(plan.getDailyAmount());
+        // Terms come from the application snapshot, never the live plan: the
+        // customer is approved on exactly what they were quoted.
+        contract.setDailyAmount(application.getInstallmentAmount() != null
+                ? application.getInstallmentAmount()
+                : application.getRequestedPrincipal().divide(BigDecimal.valueOf(plan.getDurationDays()),
+                        0, java.math.RoundingMode.CEILING));
         contract.setAmountRemaining(application.getRequestedPrincipal());
         contract.setPrincipalAmount(application.getRequestedPrincipal());
         contract.setTotalPayable(application.getRequestedPrincipal());

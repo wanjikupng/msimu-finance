@@ -1,176 +1,160 @@
-# M-Simu Finance — TRACOM Finance Hub
+# M-Simu Finance
 
-A device-financing and payment-management platform built for Tracom Academy. Customers browse phones, apply for financing, sign contracts, and pay daily; staff review applications, manage inventory, and monitor payments. Built on a Spring Boot backend and a plain HTML/CSS/JS frontend.
+A device-financing (*Lipa Mdogo Mdogo*) and payment-management platform built at **Tracom Academy**. Customers pick a phone, pay a deposit and repay a little every day; staff review applications, manage a device fleet, run the payment engine and reconcile it against the provider's statement.
 
-> **Prototype/simulation, not a live lender.**
+The phone loan is the business story. Underneath it is the infrastructure Tracom Services builds for banks: channels, agents and merchants, a device and terminal inventory, a transaction engine, and reconciliation.
+
+> **Prototype / simulation.** M-PESA is a mock adapter and the provider statement is simulated. No real money moves.
+
+## What it does
+
+| Area | Highlights |
+|---|---|
+| **Identity & security** | BCrypt passwords, stateless JWT, 7 roles, backend-enforced authorization, customers can only ever see their own records |
+| **Network & inventory** | Merchants and their agents; catalogue products vs. individual physical devices (IMEI/serial) with a guarded lifecycle `AVAILABLE → RESERVED → FINANCED ⇄ OVERDUE → PAID_OFF` |
+| **Financing** | Application → review → approve/reject. Terms are snapshotted at submission: installment = financed amount ÷ plan term, so a 90-day plan really ends in 90 days |
+| **Payment engine** | `INITIATED → PENDING → SUCCESS/FAILED → POSTED`; idempotency keys, balance reservations against double-spend, partial payments, receipts |
+| **Allocation ledger** | Every posted shilling is allocated to a specific day's installment; reversals replay the ledger instead of guessing |
+| **End-of-day** | Nightly arrears sweep moves contracts (and their devices) into and out of arrears; staff can run it on demand |
+| **Reconciliation** | Import the (simulated) M-PESA statement and match by provider reference: matched, amount/status mismatch, missing on either side, duplicates. Never changes a balance |
+| **Portals** | Customer portal, staff console (role-aware), partner portal for agents and merchants |
+
+## Quick start
+
+Requirements: Java 17+, Maven 3.9+, Python 3 (only to serve the static frontend).
+
+```bash
+# 1. Backend (port 8080)
+mvn spring-boot:run
+
+# 2. Frontend (second terminal, port 8000)
+python3 -m http.server 8000
+```
+
+Open **http://localhost:8000**. The API is at `http://localhost:8080/api/v1`; the H2 console is at `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:lipamdogo`, user `sa`, no password).
+
+The database is in-memory and rebuilt on every start, including the demo portfolio below.
+
+### Run the tests
+
+```bash
+mvn test        # 91 tests: unit + Spring integration tests
+```
+
+## Demo accounts
+
+| Role | Email | Password | Lands on |
+|---|---|---|---|
+| Admin | `admin@tracom.local` | `Admin@1234` | Staff console (everything) |
+| Loan officer | `loan.officer@tracom.local` | `Staff@1234` | Staff console: applications, customers |
+| Payments operator | `payments@tracom.local` | `Staff@1234` | Staff console: payments, reconciliation |
+| Customer | `demo@lipamdogo.com` | `Demo@1234` | Customer portal |
+| Agent | `amina.agent@tracom.local` | `Agent@1234` | Partner portal |
+| Merchant | `quickmart@tracom.local` | `Merchant@1234` | Partner portal |
+
+### Demo portfolio
+
+On a fresh start `DemoPortfolioBootstrap` creates a 40-day book of business **through the real services** (apply → review → approve → pay), so balances, allocations, receipts and device states are all genuine engine output:
+
+| Customer (password `Demo@1234`) | Story |
+|---|---|
+| `demo@lipamdogo.com` | Galaxy A15, Flex 200 Days, pays KES 70 daily; missed one day and caught up |
+| `wanjiru@demo.msimu` | Tecno Camon 20, pays three days at a time; one payment still PENDING today |
+| `otieno@demo.msimu` | Redmi 14C, stopped paying 10+ days ago, a failed attempt — **OVERDUE**, device in arrears |
+| `achieng@demo.msimu` | Infinix Hot 40, missed the last few days — **OVERDUE** (1–7 day bucket) |
+| `kiprono@demo.msimu` | Tecno Spark 10, big deposit, three lump sums — **PAID OFF** |
+| `mutua@` / `halima@` / `peter@demo.msimu` | Application queue: submitted, under review, rejected |
+
+It then runs the arrears sweep, imports the simulated M-PESA statement (with two deliberate exceptions) and runs reconciliation. For a blank system: `TRACOM_DEMO_PORTFOLIO=false mvn spring-boot:run`.
+
+## A five-minute demo script
+
+1. **Customer** (`demo@lipamdogo.com`): Home shows ownership, next due date and the payoff planner. **Pay** KES 70 → POSTED with a receipt; the phone "charges".
+2. **Phones**: pick a device, choose a plan and watch the server quote the daily installment, then e-sign and submit.
+3. **Loan officer**: Applications → open the new one → Start review → Approve. The contract and device handover happen in one transaction.
+4. **Otieno** (`otieno@demo.msimu`): an overdue customer with a locked phone. Pay to catch up and the contract returns to ACTIVE.
+5. **Admin → Overview**: portfolio at risk, the collections chart, Needs attention. **Run end-of-day** re-evaluates arrears.
+6. **Payments operator → Reconciliation**: 58/60 matched, plus an amount mismatch and an unknown paybill payment, flagged but never auto-corrected.
 
 ## Architecture
 
 ```
-Customer / Agent / Merchant
-        ↓
-   Device Financing
-        ↓
-   Payment Engine (mock M-PESA)
-        ↓
-   Loan Engine + Receipts
-        ↓
-   Settlement & Reporting
+Customers · Agents · Merchants          (portals, role-based access)
+        │
+Device inventory & lifecycle            (product ≠ physical device)
+        │
+Financing applications → contracts      (snapshotted terms)
+        │
+Payment engine → posting → allocations  (idempotent, reserved, reversible)
+        │
+End-of-day arrears sweep                (status only, never money)
+        │
+Reconciliation vs provider statement    (evidence only, never money)
 ```
 
-**Backend:** Spring Boot 3.3.3, Java 17, H2 in-memory (PostgreSQL mode), Spring Security, JWT, BCrypt, JPA.
-**Frontend:** Vanilla HTML/CSS/JS, ES modules, no build step, no frameworks.
+**Backend:** Spring Boot 3.3, Java 17, Spring Security + JWT, JPA/Hibernate, H2 (PostgreSQL mode).
+**Frontend:** Plain HTML/CSS/ES modules, no build step.
 
-## Quick start
+`docker-compose.yml` starts a PostgreSQL 16 instance for future use; the application currently runs on in-memory H2.
 
-### 1. Start the backend
-
-```bash
-cd Tracomproject
-/home/ruthmwangi/.m2/wrapper/dists/apache-maven-3.9.16-bin/5grr65jo27hi51sujmtcldfovl/apache-maven-3.9.16/bin/mvn spring-boot:run
-```
-
-If you have `mvn` on PATH you can just run `mvn spring-boot:run`. First boot downloads dependencies and takes a few minutes; later boots are fast.
-
-### 2. Start the frontend (second terminal)
-
-```bash
-cd Tracomproject
-python3 -m http.server 8000
-```
-
-### 3. Open it
-
-- **App:** http://localhost:8000
-- API: http://localhost:8080/api/v1
-- H2 console: http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:lipamdogo`, user `sa`, empty password)
-
-### 4. Log in
-
-| Account | Password | Role | Portal |
-|---|---|---|---|
-| `admin@tracom.local` | `Admin@1234` | ADMIN | Staff console |
-| `demo@lipamdogo.com` | `Demo@1234` | CUSTOMER | Customer portal |
-| `amina.agent@tracom.local` | `Agent@1234` | AGENT | Partner portal |
-| `quickmart@tracom.local` | `Merchant@1234` | MERCHANT | Partner portal |
-
-Create more accounts via the admin console or `POST /api/v1/admin/users`.
-
-## Frontend structure
+### Frontend layout
 
 ```
-index.html          Landing page with interactive calculator
-login.html          Sign in (split layout)
-signup.html         Create account
-app.html            Customer portal (hash router)
-admin.html          Staff console (hash router)
-partner.html        Agent/merchant portal
-css/app.css         Design system and all styles
-js/config.js        API base URL, roles, demo accounts
-js/api.js           Fetch wrapper, session, role guards
-js/ui.js            Escaping, formatting, toasts, modals
-js/phone.js         Charging phone SVG visual
-js/landing.js       Landing calculator
-js/auth.js          Login/signup logic
-js/customer.js      Customer portal (home, phones, pay, activity, account)
-js/admin.js         Staff console (overview, applications, customers, devices, catalog, payments, network, reports)
-js/partner.js       Agent/merchant read-only views
-legacy/             Old single-page UI (archived, not served by default)
+index.html / login.html / signup.html   Landing page and auth
+app.html      + js/customer.js          Customer portal
+admin.html    + js/admin.js             Staff console
+partner.html  + js/partner.js           Agent / merchant portal
+js/api.js     fetch wrapper, session, 401 handling
+js/ui.js      escaping, formatting, modals, drawers, toasts
+css/app.css   design system
 ```
 
-## Portals
+## Key API endpoints
 
-### Customer (`app.html`)
-- **Home:** charging phone, ownership %, due label, finish date, streak, payoff planner, activity, contract switcher
-- **Phones:** stepped flow → catalog → plan + live quote → review → e-sign → submit application
-- **Pay:** amount chips, channel selector (MPESA mock), demo controls, idempotency key, receipt + phone charges on success, PENDING polling
-- **Activity:** payment history with receipt modal, application tracking with cancel
-- **Account:** profile, cash loan request, USSD simulator (`*456#`), sign out
-
-### Staff (`admin.html`)
-- **Overview:** KPI strip, application funnel, device fleet bar, 14-day collections chart, needs-attention list
-- **Applications:** table with status filter, drawer, start-review / approve / reject with confirm
-- **Customers:** searchable table, register modal, customer dashboard drawer
-- **Devices:** filter by status/product, add modal, assign, release, change status with backend error messages
-- **Catalog:** products, payment plans, payment modes with add forms
-- **Payments:** status filter, post pending/success transactions, explain POSTED = only status that changes balances
-- **Network:** merchants and agents with creation (agent = user + profile in one modal)
-- **Reports:** collections by day, portfolio-at-risk buckets, CSV export for contracts and payments
-
-### Partner (`partner.html`)
-- **Agent:** profile, assigned devices
-- **Merchant:** business info, agents list, devices list
-
-## Backend API (key endpoints)
+All under `/api/v1`. Every endpoint except register and login needs `Authorization: Bearer <token>`.
 
 | Endpoint | Method | Roles | Purpose |
 |---|---|---|---|
-| `/auth/register` | POST | public | Create account |
-| `/auth/login` | POST | public | Sign in, get JWT |
-| `/users/me` | GET | authenticated | Own profile |
-| `/users/me/dashboard` | GET | CUSTOMER | Dashboard + timeline |
-| `/users/{id}/dashboard` | GET | ADMIN, LOAN_OFFICER | Customer dashboard |
-| `/products` | GET | authenticated | Product catalog |
-| `/financing/eligible-devices` | GET | authenticated | Available devices |
-| `/financing/payment-plans` | GET | authenticated | Payment plans |
-| `/financing/quote` | GET | authenticated | Server-authoritative quote |
-| `/financing/applications` | POST | CUSTOMER | Submit application |
-| `/financing/applications/me` | GET | CUSTOMER | My applications |
-| `/admin/financing/applications` | GET | ADMIN, LOAN_OFFICER | All applications |
-| `/admin/financing/applications/{id}/review` | POST | ADMIN, LOAN_OFFICER | Start review |
-| `/admin/financing/applications/{id}/approve` | POST | ADMIN, LOAN_OFFICER | Approve → contract |
-| `/admin/financing/applications/{id}/reject` | POST | ADMIN, LOAN_OFFICER | Reject with reason |
-| `/loans` | GET | ADMIN, LOAN_OFFICER | All contracts |
-| `/loans/me` | GET | CUSTOMER | My contracts |
-| `/payments` | POST | CUSTOMER | Initiate payment |
-| `/payments/me` | GET | CUSTOMER | My transactions |
-| `/payments/{ref}/receipt` | GET | authenticated | Receipt |
-| `/payments/{ref}/post` | POST | ADMIN, PAYMENTS_OPERATOR | Post SUCCESS payment |
-| `/payments/{ref}/reverse` | POST | ADMIN, PAYMENTS_OPERATOR | Reverse posted payment |
+| `/auth/register`, `/auth/login` | POST | public | Create account, sign in |
+| `/users/me/dashboard` | GET | CUSTOMER | Contracts, balances, timeline |
+| `/financing/quote` | GET | authenticated | Server-computed terms |
+| `/financing/applications` | POST | CUSTOMER | Submit an application |
+| `/admin/financing/applications/{id}/review` · `/approve` · `/reject` | POST | ADMIN, LOAN_OFFICER | Decision workflow |
+| `/payments` | POST | CUSTOMER | Initiate payment (`Idempotency-Key` header) |
+| `/payments/{ref}/post` · `/reverse` | POST | ADMIN, PAYMENTS_OPERATOR | Post / reverse |
 | `/admin/payments` | GET | ADMIN, PAYMENTS_OPERATOR | All transactions |
-| `/admin/users` | GET | ADMIN, LOAN_OFFICER | List users by role |
-| `/admin/users` | POST | ADMIN | Create user |
-| `/admin/devices` | GET/POST | ADMIN | Device inventory |
-| `/admin/devices/{id}/assign` | POST | ADMIN | Assign device |
-| `/admin/devices/{id}/release` | POST | ADMIN | Release device |
-| `/admin/devices/{id}/status` | PATCH | ADMIN | Change device status |
-| `/admin/merchants` | GET/POST | ADMIN | Merchants |
-| `/admin/agents` | GET/POST | ADMIN | Agents |
-| `/agents/me` | GET | AGENT | Agent profile |
-| `/merchants/me` | GET | MERCHANT | Merchant profile |
-| `/cash-loans` | POST | CUSTOMER | Request cash loan |
+| `/admin/operations/arrears-sweep` | POST | staff | Run end-of-day now |
+| `/admin/reconciliation/feed/simulate` | POST | ADMIN, PAYMENTS_OPERATOR | Import simulated M-PESA statement |
+| `/admin/reconciliation/runs` | POST | ADMIN, PAYMENTS_OPERATOR | Reconcile |
+| `/admin/devices`, `/admin/merchants`, `/admin/agents` | GET/POST | ADMIN | Inventory and network |
 
-## Dev seed data
+## Configuration
 
-The database is in-memory and re-seeds on every boot. Accounts are created by `IdentityBootstrap` and `DomainBootstrap`. Passwords come from environment variables (defaults documented in `application.properties`). Override with:
-
-```bash
-TRACOM_ADMIN_PASSWORD=Admin@1234
-TRACOM_DEMO_PASSWORD=Demo@1234
-TRACOM_AGENT_PASSWORD=Agent@1234
-TRACOM_MERCHANT_PASSWORD=Merchant@1234
-TRACOM_JWT_SECRET=your-secret-key-at-least-32-bytes
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `TRACOM_JWT_SECRET` | dev-only value | JWT signing key (≥ 32 bytes) — **set this anywhere shared** |
+| `TRACOM_ADMIN_PASSWORD`, `TRACOM_DEMO_PASSWORD`, `TRACOM_AGENT_PASSWORD`, `TRACOM_MERCHANT_PASSWORD` | see table above | Seed account passwords |
+| `TRACOM_DEMO_PORTFOLIO` | `true` | Seed the demo portfolio |
+| `TRACOM_ARREARS_CRON` | `0 5 0 * * *` | When the nightly arrears sweep runs |
 
 ## Documentation
 
-- [docs/PHASE1-AUTH.md](docs/PHASE1-AUTH.md) — Authentication, JWT, RBAC
-- [docs/PHASE2-INVENTORY.md](docs/PHASE2-INVENTORY.md) — Merchants, agents, device inventory
-- [docs/PHASE3-FINANCING.md](docs/PHASE3-FINANCING.md) — Financing applications, approval, contracts
-- [docs/PHASE4-PAYMENTS.md](docs/PHASE4-PAYMENTS.md) — Payment engine, posting, receipts
+Design notes per phase, in [`docs/`](docs):
 
-## Known seed data issue
+1. [Authentication, JWT, roles](docs/PHASE1-AUTH.md)
+2. [Merchants, agents, device inventory](docs/PHASE2-INVENTORY.md)
+3. [Financing applications and approval](docs/PHASE3-FINANCING.md)
+4. [Payment engine, reservations, allocations](docs/PHASE4-PAYMENTS.md)
+5. [Reconciliation](docs/PHASE5A-RECONCILIATION.md)
+6. [Operations hardening: end-of-day, terms, demo portfolio](docs/PHASE5.5-OPERATIONS.md)
 
-The seeded payment plans do not add up: `durationDays × dailyAmount` is less than `price − deposit`. For example, Samsung Galaxy A15: KES 14,000 to finance, 90 days × KES 70 = KES 6,300. The UI always computes days remaining from `amountRemaining / dailyAmount`, not from `planDurationDays`. Corrected seed values would be:
+## Roadmap
 
-| Plan | Daily | Days to cover KES 14,000 |
-|---|---|---|
-| Classic | KES 70 | 200 days |
-| Smart | KES 60 | 234 days |
-| Premium | KES 55 | 255 days |
-
-Or adjust `dailyAmount` upward (e.g. Classic: KES 160/day × 90 = KES 14,400).
+- **Device lock & unlock tokens:** an OVERDUE device locks, and each payment issues an offline unlock code.
+- **Agent POS:** agents collect cash repayments on a simulated payment terminal, with terminal management and end-of-day cash-up.
+- **Settlement & commissions:** daily merchant settlement batches and agent commissions.
+- **Live M-PESA sandbox:** swap the mock adapter for Safaricom Daraja (STK Push, C2B).
 
 ## License
 
-Tracom Academy demo project. Not for production use.
+Tracom Academy project. Not for production use.

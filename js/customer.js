@@ -52,9 +52,13 @@ function finishDate(c) { const d = new Date(); d.setDate(d.getDate() + daysLeft(
 function paymentStreak(t = []) {
   const days = new Set();
   for (const e of t) { if (e.status !== "POSTED" || !e.date) continue; const d = new Date(e.date); if (Number.isNaN(d.getTime())) continue; days.add(new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString()); }
-  let s = 0, c = new Date(); c = new Date(c.getFullYear(), c.getMonth(), c.getDate());
-  while (days.has(c.toDateString())) { s++; c = new Date(c - 86400000); }
-  if (s === 0 && days.has(new Date(Date.now() - 86400000).toDateString())) s = 1;
+  // Consecutive paying days ending today — or yesterday, since today's
+  // payment may simply not have been made yet.
+  const now = new Date();
+  let c = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (!days.has(c.toDateString())) c.setDate(c.getDate() - 1);
+  let s = 0;
+  while (days.has(c.toDateString())) { s++; c.setDate(c.getDate() - 1); }
   return s;
 }
 function contractSelectHtml(contracts, activeId) {

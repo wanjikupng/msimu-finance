@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS financing_applications (
     device_price DECIMAL(19,2) NOT NULL,
     deposit_amount DECIMAL(19,2) NOT NULL,
     requested_principal DECIMAL(19,2) NOT NULL,
+    installment_amount DECIMAL(19,2),
     approved_principal DECIMAL(19,2),
     reviewed_by_id BIGINT,
     decision_reason VARCHAR(500),

@@ -66,6 +66,10 @@ public class FinancingApplication {
     @Column(name = "requested_principal", nullable = false)
     private BigDecimal requestedPrincipal;
 
+    /** Daily installment quoted at submission (snapshot; approval uses it as-is). */
+    @Column(name = "installment_amount")
+    private BigDecimal installmentAmount;
+
     @Column(name = "approved_principal")
     private BigDecimal approvedPrincipal;
 
@@ -172,6 +176,14 @@ public class FinancingApplication {
 
     public void setRequestedPrincipal(BigDecimal requestedPrincipal) {
         this.requestedPrincipal = requestedPrincipal;
+    }
+
+    public BigDecimal getInstallmentAmount() {
+        return installmentAmount;
+    }
+
+    public void setInstallmentAmount(BigDecimal installmentAmount) {
+        this.installmentAmount = installmentAmount;
     }
 
     public BigDecimal getApprovedPrincipal() {
