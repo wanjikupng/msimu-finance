@@ -1,5 +1,7 @@
 package com.tracom.lipamdogo.model;
 
+import com.tracom.lipamdogo.support.SystemTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,7 +55,7 @@ public class ProviderTransaction {
     private LocalDateTime importedAt;
 
     public ProviderTransaction() {
-        this.importedAt = LocalDateTime.now();
+        this.importedAt = SystemTime.now();
     }
 
     public Long getId() {

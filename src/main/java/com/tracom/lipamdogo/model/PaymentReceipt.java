@@ -1,5 +1,7 @@
 package com.tracom.lipamdogo.model;
 
+import com.tracom.lipamdogo.support.SystemTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -46,7 +48,7 @@ public class PaymentReceipt {
     private LocalDateTime createdAt;
 
     public PaymentReceipt() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SystemTime.now();
     }
 
     public Long getId() {

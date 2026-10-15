@@ -410,3 +410,12 @@ table.data tr.clickable { cursor: pointer; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ---------- stat tiles (customer home) ---------- */
+.grid-2 > * { min-width: 0; }
+.stat-grid { display: grid; gap: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1rem; }
+@media (min-width: 1100px) { .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 0.7rem 0.85rem; display: flex; flex-direction: column; gap: 0.1rem; }
+.stat span { font-size: 0.78rem; color: var(--slate); }
+.stat strong { font-family: var(--font-head); font-size: 1.15rem; }
+.stat em { font-style: normal; font-size: 0.78rem; color: var(--muted); }

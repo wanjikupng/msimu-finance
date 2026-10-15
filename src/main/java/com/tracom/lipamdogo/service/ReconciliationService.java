@@ -18,13 +18,13 @@ import com.tracom.lipamdogo.repository.PaymentTransactionRepository;
 import com.tracom.lipamdogo.repository.ProviderTransactionRepository;
 import com.tracom.lipamdogo.repository.ReconciliationBatchRepository;
 import com.tracom.lipamdogo.repository.ReconciliationRecordRepository;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -112,11 +112,11 @@ public class ReconciliationService {
             batch.setMatchedCount(counts[1]);
             batch.setExceptionCount(counts[0] - counts[1]);
             batch.setStatus(ReconciliationBatchStatus.COMPLETED);
-            batch.setCompletedAt(LocalDateTime.now());
+            batch.setCompletedAt(SystemTime.now());
             batchRepository.save(batch);
         } catch (RuntimeException e) {
             batch.setStatus(ReconciliationBatchStatus.FAILED);
-            batch.setCompletedAt(LocalDateTime.now());
+            batch.setCompletedAt(SystemTime.now());
             batchRepository.save(batch);
             throw e;
         }
@@ -291,8 +291,8 @@ public class ReconciliationService {
         record.setStatus(status);
         record.setDifferenceAmount(difference);
         record.setReason(reason);
-        record.setReconciledAt(LocalDateTime.now());
-        record.setUpdatedAt(LocalDateTime.now());
+        record.setReconciledAt(SystemTime.now());
+        record.setUpdatedAt(SystemTime.now());
         recordRepository.save(record);
     }
 
@@ -326,6 +326,6 @@ public class ReconciliationService {
     }
 
     private String number(String prefix, Long id) {
-        return "%s-%d-%06d".formatted(prefix, LocalDate.now().getYear(), id);
+        return "%s-%d-%06d".formatted(prefix, SystemTime.today().getYear(), id);
     }
 }

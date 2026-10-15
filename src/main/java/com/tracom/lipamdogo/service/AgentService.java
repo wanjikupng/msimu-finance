@@ -12,12 +12,12 @@ import com.tracom.lipamdogo.model.UserAccount;
 import com.tracom.lipamdogo.repository.AgentRepository;
 import com.tracom.lipamdogo.repository.MerchantRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -74,7 +74,7 @@ public class AgentService {
         if (request.status() != null) {
             agent.setStatus(request.status());
         }
-        agent.setUpdatedAt(LocalDateTime.now());
+        agent.setUpdatedAt(SystemTime.now());
         return AgentResponse.from(agentRepository.save(agent));
     }
 

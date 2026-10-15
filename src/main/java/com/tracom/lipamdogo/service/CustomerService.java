@@ -16,6 +16,7 @@ import com.tracom.lipamdogo.repository.PaymentReceiptRepository;
 import com.tracom.lipamdogo.repository.PaymentTransactionRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
 import com.tracom.lipamdogo.security.UserPrincipal;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,7 +99,7 @@ public class CustomerService {
 
         // Arrears: for each live contract past its due date, the unpaid slice
         // of the currently due installment. Deterministic, server-computed.
-        LocalDate today = LocalDate.now();
+        LocalDate today = SystemTime.today();
         BigDecimal arrears = BigDecimal.ZERO;
         BigDecimal todayExpected = BigDecimal.ZERO;
         boolean anyOverdue = false;

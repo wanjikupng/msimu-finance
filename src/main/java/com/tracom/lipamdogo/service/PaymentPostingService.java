@@ -14,6 +14,7 @@ import com.tracom.lipamdogo.repository.LoanContractRepository;
 import com.tracom.lipamdogo.repository.PaymentAllocationRepository;
 import com.tracom.lipamdogo.repository.PaymentReceiptRepository;
 import com.tracom.lipamdogo.repository.PaymentTransactionRepository;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -108,8 +109,8 @@ public class PaymentPostingService {
 
         transaction.setPostedAmount(apply);
         transaction.setStatus(PaymentTransactionStatus.POSTED);
-        transaction.setPostedAt(LocalDateTime.now());
-        transaction.setUpdatedAt(LocalDateTime.now());
+        transaction.setPostedAt(SystemTime.now());
+        transaction.setUpdatedAt(SystemTime.now());
         transactionRepository.save(transaction);
 
         refreshLoanState(contract);
@@ -161,7 +162,7 @@ public class PaymentPostingService {
         contract.setAmountPaid(contract.getAmountPaid().subtract(posted).max(BigDecimal.ZERO));
         contract.setAmountRemaining(contract.getTotalPayable().subtract(contract.getAmountPaid()));
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = SystemTime.now();
         List<PaymentAllocation> rows =
                 allocationRepository.findByPaymentTransactionIdAndStatus(transaction.getId(), AllocationStatus.ACTIVE);
         for (PaymentAllocation row : rows) {
@@ -175,7 +176,7 @@ public class PaymentPostingService {
         transaction.setStatus(PaymentTransactionStatus.REVERSED);
         transaction.setReversalReference("REV-" + transaction.getId());
         transaction.setReversalReason(reason.trim());
-        transaction.setUpdatedAt(LocalDateTime.now());
+        transaction.setUpdatedAt(SystemTime.now());
         transactionRepository.save(transaction);
 
         refreshLoanState(contract);
@@ -198,11 +199,30 @@ public class PaymentPostingService {
             }
             return;
         }
-        if (LocalDate.now().isAfter(contract.getNextPaymentDueDate())
+        if (SystemTime.today().isAfter(contract.getNextPaymentDueDate())
                 && contract.getInstallmentPaid().compareTo(contract.getDailyAmount()) < 0) {
             contract.setStatus(LoanStatus.OVERDUE);
         } else {
             contract.setStatus(LoanStatus.ACTIVE);
+        }
+        syncDeviceWithArrears(contract);
+    }
+
+    /**
+     * Keeps the physical device in step with the contract: a device whose
+     * contract falls into arrears moves FINANCED → OVERDUE (the state a
+     * device-lock integration acts on), and back to FINANCED once the
+     * customer catches up. Any other device state (repair, lost) is left alone.
+     */
+    private void syncDeviceWithArrears(LoanContract contract) {
+        Device device = contract.getDevice();
+        if (device == null) {
+            return;
+        }
+        if (contract.getStatus() == LoanStatus.OVERDUE && device.getStatus() == DeviceStatus.FINANCED) {
+            deviceService.markInArrears(device.getId());
+        } else if (contract.getStatus() == LoanStatus.ACTIVE && device.getStatus() == DeviceStatus.OVERDUE) {
+            deviceService.clearArrears(device.getId());
         }
     }
 
@@ -364,6 +384,6 @@ public class PaymentPostingService {
     }
 
     private String number(String prefix, Long id) {
-        return "%s-%d-%06d".formatted(prefix, LocalDate.now().getYear(), id);
+        return "%s-%d-%06d".formatted(prefix, SystemTime.today().getYear(), id);
     }
 }

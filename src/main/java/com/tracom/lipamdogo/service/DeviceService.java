@@ -17,12 +17,12 @@ import com.tracom.lipamdogo.repository.DeviceRepository;
 import com.tracom.lipamdogo.repository.MerchantRepository;
 import com.tracom.lipamdogo.repository.ProductRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -140,7 +140,7 @@ public class DeviceService {
             device.setCustomer(null);
             move(device, DeviceStatus.ASSIGNED);
         }
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 
@@ -158,7 +158,7 @@ public class DeviceService {
         device.setAgent(null);
         device.setCustomer(null);
         move(device, DeviceStatus.AVAILABLE);
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 
@@ -173,7 +173,7 @@ public class DeviceService {
             throw new IllegalArgumentException("Only AVAILABLE devices can be reserved for financing.");
         }
         move(device, DeviceStatus.RESERVED);
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 
@@ -189,7 +189,7 @@ public class DeviceService {
             throw new IllegalArgumentException("Only RESERVED devices can have their reservation released.");
         }
         move(device, DeviceStatus.AVAILABLE);
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 
@@ -209,7 +209,34 @@ public class DeviceService {
         device.setCustomer(customer);
         device.setAgent(null);
         move(device, DeviceStatus.FINANCED);
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
+        return DeviceResponse.from(deviceRepository.save(device));
+    }
+
+    /**
+     * Arrears transitions driven by the contract (never by staff input):
+     * FINANCED → OVERDUE when the customer falls behind, OVERDUE → FINANCED
+     * once they catch up. Relationships (customer, merchant) are unchanged.
+     */
+    @Transactional
+    public DeviceResponse markInArrears(Long deviceId) {
+        Device device = requireDevice(deviceId);
+        if (device.getStatus() != DeviceStatus.FINANCED) {
+            throw new IllegalArgumentException("Only FINANCED devices can move into arrears.");
+        }
+        move(device, DeviceStatus.OVERDUE);
+        device.setUpdatedAt(SystemTime.now());
+        return DeviceResponse.from(deviceRepository.save(device));
+    }
+
+    @Transactional
+    public DeviceResponse clearArrears(Long deviceId) {
+        Device device = requireDevice(deviceId);
+        if (device.getStatus() != DeviceStatus.OVERDUE) {
+            throw new IllegalArgumentException("Only OVERDUE devices can return to FINANCED.");
+        }
+        move(device, DeviceStatus.FINANCED);
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 
@@ -225,7 +252,7 @@ public class DeviceService {
         }
         Device device = requireDevice(deviceId);
         move(device, request.status());
-        device.setUpdatedAt(LocalDateTime.now());
+        device.setUpdatedAt(SystemTime.now());
         return DeviceResponse.from(deviceRepository.save(device));
     }
 

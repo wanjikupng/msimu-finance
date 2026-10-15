@@ -1,5 +1,7 @@
 package com.tracom.lipamdogo.model;
 
+import com.tracom.lipamdogo.support.SystemTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -47,7 +49,7 @@ public class UserAccount {
     private LocalDateTime createdAt;
 
     public UserAccount() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = SystemTime.now();
     }
 
     public Long getId() {

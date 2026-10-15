@@ -22,13 +22,12 @@ import com.tracom.lipamdogo.repository.PaymentModeRepository;
 import com.tracom.lipamdogo.repository.PaymentPlanRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
 import com.tracom.lipamdogo.security.UserPrincipal;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -182,7 +181,7 @@ public class FinancingService {
             throw new IllegalArgumentException("Only undecided applications can be cancelled.");
         }
         application.setStatus(ApplicationStatus.CANCELLED);
-        application.setUpdatedAt(LocalDateTime.now());
+        application.setUpdatedAt(SystemTime.now());
         deviceService.releaseReservation(application.getDevice().getId());
         return FinancingApplicationResponse.from(applicationRepository.save(application));
     }
@@ -208,7 +207,7 @@ public class FinancingService {
             throw new IllegalArgumentException("Only SUBMITTED applications can be taken into review.");
         }
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
-        application.setUpdatedAt(LocalDateTime.now());
+        application.setUpdatedAt(SystemTime.now());
         return FinancingApplicationResponse.from(applicationRepository.save(application));
     }
 
@@ -256,9 +255,9 @@ public class FinancingService {
         contract.setPlanName(plan.getPlanName());
         contract.setPlanDurationDays(plan.getDurationDays());
         contract.setStatus(LoanStatus.ACTIVE);
-        contract.setNextPaymentDueDate(LocalDate.now().plusDays(1));
+        contract.setNextPaymentDueDate(SystemTime.today().plusDays(1));
         contract.setScheduleAnchorDate(contract.getNextPaymentDueDate());
-        contract.setCreatedAt(LocalDateTime.now());
+        contract.setCreatedAt(SystemTime.now());
 
         LoanContract saved = loanContractRepository.saveAndFlush(contract);
         saved.setContractNumber(number("LN", saved.getId()));
@@ -269,8 +268,8 @@ public class FinancingService {
         application.setStatus(ApplicationStatus.APPROVED);
         application.setApprovedPrincipal(application.getRequestedPrincipal());
         application.setReviewedBy(reviewerAccount);
-        application.setReviewedAt(LocalDateTime.now());
-        application.setUpdatedAt(LocalDateTime.now());
+        application.setReviewedAt(SystemTime.now());
+        application.setUpdatedAt(SystemTime.now());
         applicationRepository.save(application);
 
         return LoanContractResponse.from(saved);
@@ -290,8 +289,8 @@ public class FinancingService {
         application.setStatus(ApplicationStatus.REJECTED);
         application.setDecisionReason(decisionReason.trim());
         application.setReviewedBy(requireAccount(reviewer.getId()));
-        application.setReviewedAt(LocalDateTime.now());
-        application.setUpdatedAt(LocalDateTime.now());
+        application.setReviewedAt(SystemTime.now());
+        application.setUpdatedAt(SystemTime.now());
         applicationRepository.save(application);
 
         Device device = deviceRepository.findById(application.getDevice().getId()).orElse(null);
@@ -332,6 +331,6 @@ public class FinancingService {
     }
 
     private String number(String prefix, Long id) {
-        return "%s-%d-%06d".formatted(prefix, LocalDate.now().getYear(), id);
+        return "%s-%d-%06d".formatted(prefix, SystemTime.today().getYear(), id);
     }
 }

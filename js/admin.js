@@ -238,7 +238,7 @@ async function renderApplications(opts = {}) {
           ${filtered.length === 0 ? emptyState("No applications", filter ? "Try a different filter." : "Applications will appear here once customers apply.") : `<div class="table-scroll"><table class="data"><thead><tr><th>Application</th><th>Customer</th><th>Device</th><th>Deposit</th><th>Financed</th><th>Status</th><th></th></tr></thead><tbody>${filtered.map((a) => `<tr class="clickable" data-view="${esc(String(a.id))}"><td>${esc(a.applicationNumber || "")}</td><td>${esc(a.customerName || "")}</td><td>${esc(a.productName || "")}</td><td>${money(a.depositAmount)}</td><td>${money(a.requestedPrincipal)}</td><td>${statusChip(a.status)}</td><td><button class="btn btn-ghost btn-sm" data-view="${esc(String(a.id))}">Review</button></td></tr>`).join("")}</tbody></table></div>`}
         </section>`;
       document.getElementById("app-filter").addEventListener("change", (e) => { filter = e.target.value; render(); });
-      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", () => viewApplication(apps.find((a) => String(a.id) === el.dataset.view))));
+      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); viewApplication(apps.find((a) => String(a.id) === el.dataset.view)); }));
       const open = consumeOpen();
       if (open) viewApplication(apps.find((a) => String(a.id) === open));
     }
@@ -307,7 +307,7 @@ async function renderCustomers(opts = {}) {
         </section>`;
       document.getElementById("cust-search").addEventListener("input", (e) => { search = e.target.value.toLowerCase().trim(); render(); });
       document.getElementById("add-customer-btn").addEventListener("click", () => openRegisterCustomerModal());
-      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", () => viewCustomer(users.find((u) => String(u.id) === el.dataset.view))));
+      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); viewCustomer(users.find((u) => String(u.id) === el.dataset.view)); }));
       const open = consumeOpen();
       if (open) viewCustomer(users.find((u) => String(u.id) === open));
     }
@@ -413,7 +413,7 @@ async function renderDevices(opts = {}) {
       document.getElementById("dev-status").addEventListener("change", (e) => { statusF = e.target.value; render(); });
       document.getElementById("dev-product").addEventListener("change", (e) => { productF = e.target.value; render(); });
       document.getElementById("add-device-btn").addEventListener("click", () => openAddDeviceModal());
-      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", () => viewDevice(devices.find((d) => String(d.id) === el.dataset.view))));
+      document.querySelectorAll("[data-view]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); viewDevice(devices.find((d) => String(d.id) === el.dataset.view)); }));
       const open = consumeOpen();
       if (open) viewDevice(devices.find((d) => String(d.id) === open));
     }

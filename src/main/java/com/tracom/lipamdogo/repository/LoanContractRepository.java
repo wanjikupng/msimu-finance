@@ -36,6 +36,9 @@ public interface LoanContractRepository extends JpaRepository<LoanContract, Long
 
     long countByStatus(LoanStatus status);
 
+    @Query("select c.id from LoanContract c where c.status in :statuses order by c.id")
+    List<Long> findIdsByStatusIn(Collection<LoanStatus> statuses);
+
     /**
      * Write-locked fetch so concurrent postings against the same contract
      * serialize instead of racing the balance.

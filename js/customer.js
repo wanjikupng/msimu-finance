@@ -1,7 +1,7 @@
 // Customer portal: shell, home, phones, pay, activity, account.
 // No /admin calls are made anywhere; every server string goes through esc().
 import { api, requireRole, signOut } from "./api.js";
-import { fmtDate, fmtDateTime, esc, money, skeletonRows, emptyState, statusChip, toast, debounce, confirmDialog, openModal } from "./ui.js";
+import { fmtDate, fmtDateTime, esc, money, skeletonRows, emptyState, statusChip, toast, debounce, confirmDialog, openModal, dueLabel } from "./ui.js";
 import { ownershipPct, renderPhone, phoneStateFor } from "./phone.js";
 
 // ─── guards ───────────────────────────────────────────────────────────────────
@@ -75,12 +75,13 @@ async function renderHome() {
     const tl = dashboard.paymentTimeline || [];
     const active = contracts.find((c) => c.loanStatus === "ACTIVE" || c.loanStatus === "OVERDUE") || contracts[0] || null;
     const pendingApp = Array.isArray(apps) ? apps.find((a) => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW") : null;
+    const due = active ? dueLabel(active.nextPaymentDueDate) : "";
     let html = `<section class="wrap page-head"><div class="grid-2 uneven">`;
     if (!active) {
       html += `<div><h1>Track your phone.</h1><p>${esc(pendingApp ? `Application ${pendingApp.applicationNumber ?? ""} is ${pendingApp.status ?? ""}.` : "Choose your first phone to get started.")}</p><div class="btn-row"><a class="btn btn-primary" href="#/phones">${esc(pendingApp ? "Check status" : "Choose a phone")}</a></div></div><div class="card empty"><p class="small">No active contract yet.</p></div>`;
     } else {
-      const pct = ownershipPct(active), due = dueLabel(active.nextPaymentDueDate), finish = finishDate(active), state = phoneStateFor(active, due.includes("late") ? -1 : 0), streak = paymentStreak(tl);
-      html += `<div><h1>${state === "owned" ? "You own it." : "Track your phone."}</h1><div class="btn-row"><a class="btn btn-primary" href="#/pay">${money(active.dailyAmount)} due</a><a class="btn btn-secondary btn-sm" href="#/activity">See payments</a></div><div class="kv" style="margin-top:1rem"><dl class="kv"><dt>Phone</dt><dd>${esc(active.productName || "Phone")}</dd></dl><dl class="kv"><dt>Ownership</dt><dd>${Math.round(pct)}%</dd></dl><dl class="kv"><dt>Remaining</dt><dd>${money(active.amountRemaining)}</dd></dl><dl class="kv"><dt>Next due</dt><dd>${esc(due)}</dd></dl><dl class="kv"><dt>Finish in ~${esc(String(daysLeft(active)))} days</dt><dd>${esc(fmtDate(finish))}</dd></dl><dl class="kv"><dt>Streak</dt><dd>${esc(String(streak))} day${streak === 1 ? "" : "s"}</dd></dl>${statusChip(active.loanStatus)}</div></div>`;
+      const pct = ownershipPct(active), finish = finishDate(active), state = phoneStateFor(active, due.includes("late") ? -1 : 0), streak = paymentStreak(tl);
+      html += `<div><h1>${state === "owned" ? "You own it." : "Track your phone."}</h1><div class="btn-row"><a class="btn btn-primary" href="#/pay">${money(active.dailyAmount)} due</a><a class="btn btn-secondary btn-sm" href="#/activity">See payments</a></div><p class="small" style="margin-top:0.75rem">${esc(active.productName || "Phone")} · <span class="mono">${esc(active.contractNumber || "")}</span> · ${statusChip(active.loanStatus)}</p><div class="stat-grid"><div class="stat"><span>Ownership</span><strong>${Math.round(pct)}%</strong></div><div class="stat"><span>Remaining</span><strong>${money(active.amountRemaining)}</strong></div><div class="stat"><span>Next due</span><strong>${esc(due)}</strong></div><div class="stat"><span>Own it by</span><strong>${esc(fmtDate(finish))}</strong><em>~${esc(String(daysLeft(active)))} days</em></div><div class="stat"><span>Paid so far</span><strong>${money(active.amountPaid)}</strong></div><div class="stat"><span>Streak</span><strong>${esc(String(streak))} day${streak === 1 ? "" : "s"}</strong></div></div></div>`;
       html += `<div class="card"><div class="phone-stage"><div id="home-phone" class="phone-figure"></div><div><div class="bignum">${Math.round(pct)}% paid</div><p class="small">${money(active.dailyAmount)}/day · ${esc(active.planName || "")}</p></div></div><div class="mt">${contractSelectHtml(contracts, active.id)}</div><div class="card mt" style="background:var(--paper)"><h3 class="bignum" style="font-size:1.1rem">Payoff planner</h3><p class="small">What if you pay a little more each day?</p><div class="grid-2" style="gap:0.6rem">${[10, 20, 50].map((x) => { const nd = daysLeft({ amountRemaining: active.amountRemaining, dailyAmount: active.dailyAmount + x }); return `<div class="card"><div class="kv"><dt>+KES ${x}/day</dt><dd>${esc(String(nd))} days</dd></div><div class="small">Save ${esc(String(Math.max(0, daysLeft(active) - nd)))} days</div></div>`; }).join("")}</div></div>${timelineHtml(tl)}</div>`;
     }
     html += `</div></section>`;

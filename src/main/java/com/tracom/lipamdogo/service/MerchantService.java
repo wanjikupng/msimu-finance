@@ -11,12 +11,12 @@ import com.tracom.lipamdogo.repository.AgentRepository;
 import com.tracom.lipamdogo.repository.DeviceRepository;
 import com.tracom.lipamdogo.repository.MerchantRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -78,7 +78,7 @@ public class MerchantService {
         if (request.ownerId() != null) {
             merchant.setOwner(requireMerchantCapableOwner(request.ownerId()));
         }
-        merchant.setUpdatedAt(LocalDateTime.now());
+        merchant.setUpdatedAt(SystemTime.now());
         return toResponse(merchantRepository.save(merchant));
     }
 

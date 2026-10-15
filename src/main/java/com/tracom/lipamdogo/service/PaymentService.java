@@ -22,6 +22,7 @@ import com.tracom.lipamdogo.repository.PaymentAllocationRepository;
 import com.tracom.lipamdogo.repository.PaymentReceiptRepository;
 import com.tracom.lipamdogo.repository.PaymentTransactionRepository;
 import com.tracom.lipamdogo.security.UserPrincipal;
+import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,8 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -203,17 +202,17 @@ public class PaymentService {
         }
         if (outcome == ProviderOutcome.SUCCESS) {
             transaction.setStatus(PaymentTransactionStatus.SUCCESS);
-            transaction.setCompletedAt(LocalDateTime.now());
+            transaction.setCompletedAt(SystemTime.now());
         } else if (outcome == ProviderOutcome.FAILED) {
             transaction.setStatus(PaymentTransactionStatus.FAILED);
             transaction.setFailureReason(failureReason == null || failureReason.isBlank()
                     ? "Provider reported failure (simulation)."
                     : failureReason.trim());
-            transaction.setCompletedAt(LocalDateTime.now());
+            transaction.setCompletedAt(SystemTime.now());
         } else {
             throw new IllegalArgumentException("Provider result must be SUCCESS or FAILED.");
         }
-        transaction.setUpdatedAt(LocalDateTime.now());
+        transaction.setUpdatedAt(SystemTime.now());
         transactionRepository.save(transaction);
         return toResponse(transaction);
     }
@@ -281,7 +280,7 @@ public class PaymentService {
             case SUCCESS -> {
                 transaction.setStatus(PaymentTransactionStatus.SUCCESS);
                 transaction.setProviderReference(result.providerReference());
-                transaction.setCompletedAt(LocalDateTime.now());
+                transaction.setCompletedAt(SystemTime.now());
             }
             case PENDING -> {
                 transaction.setStatus(PaymentTransactionStatus.PENDING);
@@ -291,10 +290,10 @@ public class PaymentService {
                 transaction.setStatus(PaymentTransactionStatus.FAILED);
                 transaction.setProviderReference(result.providerReference());
                 transaction.setFailureReason(result.failureReason());
-                transaction.setCompletedAt(LocalDateTime.now());
+                transaction.setCompletedAt(SystemTime.now());
             }
         }
-        transaction.setUpdatedAt(LocalDateTime.now());
+        transaction.setUpdatedAt(SystemTime.now());
         transactionRepository.save(transaction);
     }
 
@@ -343,6 +342,6 @@ public class PaymentService {
     }
 
     private String number(String prefix, Long id) {
-        return "%s-%d-%06d".formatted(prefix, LocalDate.now().getYear(), id);
+        return "%s-%d-%06d".formatted(prefix, SystemTime.today().getYear(), id);
     }
 }

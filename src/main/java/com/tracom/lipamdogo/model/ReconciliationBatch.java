@@ -1,5 +1,7 @@
 package com.tracom.lipamdogo.model;
 
+import com.tracom.lipamdogo.support.SystemTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -59,8 +61,8 @@ public class ReconciliationBatch {
     private LocalDateTime createdAt;
 
     public ReconciliationBatch() {
-        this.startedAt = LocalDateTime.now();
-        this.createdAt = LocalDateTime.now();
+        this.startedAt = SystemTime.now();
+        this.createdAt = SystemTime.now();
     }
 
     public Long getId() {

@@ -1,5 +1,7 @@
 package com.tracom.lipamdogo.model;
 
+import com.tracom.lipamdogo.support.SystemTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -65,7 +67,7 @@ public class ReconciliationRecord {
     private LocalDateTime updatedAt;
 
     public ReconciliationRecord() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = SystemTime.now();
         this.reconciledAt = now;
         this.createdAt = now;
         this.updatedAt = now;
