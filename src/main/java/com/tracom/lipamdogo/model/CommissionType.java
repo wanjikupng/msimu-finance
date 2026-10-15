@@ -9,5 +9,11 @@ public enum CommissionType {
     /** Merchant's override on collections made at its terminals. */
     MERCHANT_COLLECTION,
     /** Merchant's fixed fee for a phone financed from its stock. */
-    MERCHANT_SALE
+    MERCHANT_SALE,
+    /**
+     * M-PESA pays whole shillings: the cents left after rounding a payout down
+     * are taken out of this settlement (negative) and carried into the next
+     * one (positive), so nothing is lost.
+     */
+    ROUNDING_CARRY
 }

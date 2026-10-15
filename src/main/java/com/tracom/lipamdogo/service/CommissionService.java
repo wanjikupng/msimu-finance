@@ -193,7 +193,9 @@ public class CommissionService {
         List<CommissionEntry> own = all.stream().filter(e -> e.getBeneficiaryType() == BeneficiaryType.MERCHANT).toList();
         List<BeneficiaryBalanceResponse> agents = balancesOf(
                 all.stream().filter(e -> e.getBeneficiaryType() == BeneficiaryType.AGENT).toList());
+        // The business's own payouts only; its agents are paid personally (B2C) and shown per agent.
         List<SettlementLineResponse> payouts = lineRepository.findAllByMerchantIdOrderByIdDesc(merchant.getId()).stream()
+                .filter(l -> l.getBeneficiaryType() == BeneficiaryType.MERCHANT)
                 .map(SettlementLineResponse::from).toList();
         return partnerView(own, payouts, agents);
     }

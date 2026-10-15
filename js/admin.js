@@ -2,7 +2,7 @@
 // payments, network, reports. Role-gated sidebar shows only permitted sections.
 // Every string injected into HTML goes through esc(); no customer-only endpoints.
 import { api, requireRole, signOut } from "./api.js";
-import { esc, money, fmtDate, fmtDateTime, skeletonRows, emptyState, statusChip, toast, confirmDialog, openModal, openDrawer, setFieldErrors, dueLabel } from "./ui.js";
+import { esc, money, moneyExact, fmtDate, fmtDateTime, skeletonRows, emptyState, statusChip, toast, confirmDialog, openModal, openDrawer, setFieldErrors, dueLabel } from "./ui.js";
 
 // ─── guards ───────────────────────────────────────────────────────────────────
 const ALLOWED = ["ADMIN", "LOAN_OFFICER", "PAYMENTS_OPERATOR"];
@@ -23,6 +23,7 @@ const SECTIONS = [
   { id: "#/catalog", label: "Catalog", roles: ["ADMIN"] },
   { id: "#/payments", label: "Payments", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
   { id: "#/reconciliation", label: "Reconciliation", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
+  { id: "#/settlements", label: "Settlements", roles: ["ADMIN", "PAYMENTS_OPERATOR"] },
   { id: "#/network", label: "Network", roles: ["ADMIN"] },
   { id: "#/reports", label: "Reports", roles: ["ADMIN"] },
 ];
@@ -37,6 +38,7 @@ const routes = {
   "#/catalog": renderCatalog,
   "#/payments": renderPayments,
   "#/reconciliation": renderReconciliation,
+  "#/settlements": renderSettlements,
   "#/network": renderNetwork,
   "#/reports": renderReports,
 };
@@ -625,6 +627,105 @@ async function renderTerminals() {
     }
   } catch (err) {
     page().innerHTML = `<section class="wrap page-head"><div class="form-error">${esc(err.message || "Unable to load terminals.")}</div></section>`;
+  }
+}
+
+// ─── SETTLEMENTS (commission payouts) ────────────────────────────────────────
+// Repayments belong to M-Simu; partners earn commission. A settlement run
+// nets what each agent / merchant is owed and, once a SECOND staff member
+// approves it, pays it out over M-PESA (B2C to agents, B2B to merchants).
+async function renderSettlements() {
+  page().innerHTML = `<section class="wrap page-head"><h2>Settlements</h2><div class="skeleton" style="height:300px;border-radius:18px"></div></section>`;
+  try {
+    const [plan, balances, batches, ledger] = await Promise.all([
+      api("/admin/commissions/plan"), api("/admin/commissions/balances"),
+      api("/admin/settlements"), api("/admin/commissions?limit=60"),
+    ]);
+    const sum = (k) => balances.reduce((s, b) => s + Number(b[k] || 0), 0);
+    const owedPartners = balances.filter((b) => Number(b.accrued) > 0).length;
+    const pct = (r) => `${(Number(r) * 100).toFixed(Number(r) * 100 % 1 ? 1 : 0)}%`;
+    const typeLabel = { AGENT_COLLECTION: "Agent collection", MERCHANT_COLLECTION: "Merchant override", MERCHANT_SALE: "Phone sale fee", ROUNDING_CARRY: "Cents carried (M-PESA pays whole KES)" };
+    const yesterday = new Date(Date.now() - 86400000);
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    page().innerHTML = `
+      <section class="wrap page-head">
+        <div class="head-row"><h2>Settlements</h2><button class="btn btn-primary btn-sm" id="run-settlement-btn">Prepare settlement</button></div>
+        <p class="small">Customer repayments belong to M-Simu Finance. Agents and merchants earn commission on the business they bring, paid out over M-PESA. Every payout needs two people: one prepares the batch, a different one approves it.</p>
+        <div class="kpis">
+          <div class="kpi"><div class="k-label">Owed to partners</div><div class="k-value">${moneyExact(sum("accrued"))}</div></div>
+          <div class="kpi"><div class="k-label">Partners owed</div><div class="k-value">${esc(String(owedPartners))}</div></div>
+          <div class="kpi"><div class="k-label">Awaiting approval</div><div class="k-value">${moneyExact(sum("inSettlement"))}</div></div>
+          <div class="kpi"><div class="k-label">Paid out to date</div><div class="k-value">${moneyExact(sum("settled"))}</div></div>
+          <div class="kpi"><div class="k-label">Batches</div><div class="k-value">${esc(String(batches.length))}</div></div>
+          <div class="kpi"><div class="k-label">Pending approval</div><div class="k-value">${esc(String(batches.filter((b) => b.status === "PENDING_APPROVAL").length))}</div></div>
+        </div>
+        <div class="card mt"><h3>Commission plan</h3>
+          <div class="stat-grid">
+            <div class="stat"><span>Agent, per terminal collection</span><strong>${esc(pct(plan.agentCollectionRate))}</strong><em>capped at ${money(plan.agentCollectionCap)} per payment</em></div>
+            <div class="stat"><span>Merchant override on its terminals</span><strong>${esc(pct(plan.merchantCollectionRate))}</strong></div>
+            <div class="stat"><span>Merchant, per phone financed from its stock</span><strong>${money(plan.merchantSaleFee)}</strong></div>
+          </div>
+          <p class="small mt">Commission accrues when a payment posts, never when it is only requested. If a payment is reversed, its commission is clawed back and netted from the next payout. M-PESA pays whole shillings, so cents are carried to the next payout.</p>
+        </div>
+        <div class="card mt"><h3>Settlement batches</h3>
+          ${batches.length === 0 ? emptyState("No settlements yet", "Prepare the first one.") : `<div class="table-scroll"><table class="data"><thead><tr><th>Batch</th><th>Cut-off</th><th>Payouts</th><th>Total</th><th>Status</th><th>Prepared by</th><th>Approved / rejected by</th><th></th></tr></thead><tbody>${batches.map((b) => `<tr class="clickable" data-batch="${esc(String(b.id))}"><td class="mono">${esc(b.batchNumber)}</td><td>${esc(fmtDate(b.cutoffDate))}</td><td>${esc(String(b.lineCount))}</td><td>${money(b.totalAmount)}</td><td>${statusChip(b.status)}</td><td>${esc(b.createdBy)}</td><td>${esc(b.decidedBy || "—")}</td><td><button class="btn btn-ghost btn-sm" data-batch="${esc(String(b.id))}">Open</button></td></tr>`).join("")}</tbody></table></div>`}
+        </div>
+        <div class="card mt"><h3>What partners are owed</h3>
+          ${balances.length === 0 ? emptyState("No commission yet", "Commission appears once agents collect M-PESA payments.") : `<div class="table-scroll"><table class="data"><thead><tr><th>Partner</th><th>Type</th><th>Merchant</th><th>Owed</th><th>Awaiting approval</th><th>Paid to date</th></tr></thead><tbody>${balances.map((b) => `<tr><td>${esc(b.name)}</td><td>${statusChip(b.beneficiaryType)}</td><td>${esc(b.merchantName)}</td><td><strong>${moneyExact(b.accrued)}</strong></td><td>${moneyExact(b.inSettlement)}</td><td>${moneyExact(b.settled)}</td></tr>`).join("")}</tbody></table></div>`}
+        </div>
+        <div class="card mt"><h3>Commission ledger <span class="small">(latest 60)</span></h3>
+          ${ledger.length === 0 ? "" : `<div class="table-scroll"><table class="data"><thead><tr><th>Earned</th><th>Partner</th><th>For</th><th>Payment / contract</th><th>Base</th><th>Amount</th><th>Status</th></tr></thead><tbody>${ledger.map((e) => `<tr><td>${esc(fmtDateTime(e.earnedAt))}</td><td>${esc(e.beneficiaryName)}</td><td>${esc(typeLabel[e.commissionType] || e.commissionType)}${e.clawback ? ' <span class="chip chip-red">CLAWBACK</span>' : ""}</td><td class="mono">${esc(e.transactionReference || e.contractNumber || "")}${e.terminalCode ? ` <span class="small">${esc(e.terminalCode)}</span>` : ""}</td><td>${e.commissionType === "MERCHANT_SALE" ? "flat" : e.commissionType === "ROUNDING_CARRY" ? "—" : money(e.baseAmount)}</td><td${Number(e.amount) < 0 ? ' style="color:var(--lock-text)"' : ""}>${moneyExact(e.amount)}</td><td>${statusChip(e.status)}</td></tr>`).join("")}</tbody></table></div>`}
+        </div>
+      </section>`;
+
+    document.getElementById("run-settlement-btn").addEventListener("click", () => {
+      openModal({ title: "Prepare settlement", bodyHTML: `
+        <p class="small">Collects every unpaid commission earned up to and including the cut-off date, nets clawbacks, and creates one M-PESA payout per partner. Nothing is paid until a <strong>different</strong> staff member approves it.</p>
+        <div class="field"><label for="cutoff">Cut-off date</label><input id="cutoff" type="date" value="${iso(yesterday)}" max="${iso(new Date())}" /></div>
+        <div class="btn-row"><button class="btn btn-primary btn-sm" id="cutoff-go">Prepare batch</button></div>` });
+      document.getElementById("cutoff-go").addEventListener("click", async () => {
+        try {
+          const b = await api("/admin/settlements", { method: "POST", body: { cutoffDate: document.getElementById("cutoff").value } });
+          toast(`${b.batchNumber}: ${b.lineCount} payouts, ${money(b.totalAmount)}. Awaiting a second approver.`, "success");
+          document.querySelector(".modal-close")?.click();
+          renderSettlements();
+        } catch (e) { toast(e.message || "Could not prepare settlement.", "error"); }
+      });
+    });
+    document.querySelectorAll("[data-batch]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); viewBatch(batches.find((b) => String(b.id) === el.dataset.batch)); }));
+
+    function viewBatch(b) {
+      if (!b) return;
+      const mine = me && Number(me.userId) === Number(b.createdById);
+      const pending = b.status === "PENDING_APPROVAL";
+      openDrawer(`Settlement ${b.batchNumber}`, `
+        <div style="margin-bottom:0.75rem">${statusChip(b.status)}</div>
+        <div class="kv"><dt>Cut-off</dt><dd>${esc(fmtDate(b.cutoffDate))}</dd></div>
+        <div class="kv"><dt>Total</dt><dd><strong>${money(b.totalAmount)}</strong> in ${esc(String(b.lineCount))} M-PESA payouts</dd></div>
+        <div class="kv"><dt>Prepared by</dt><dd>${esc(b.createdBy)} · ${esc(fmtDateTime(b.createdAt))}</dd></div>
+        ${b.decidedBy ? `<div class="kv"><dt>${b.status === "REJECTED" ? "Rejected" : "Approved"} by</dt><dd>${esc(b.decidedBy)} · ${esc(fmtDateTime(b.decidedAt))}</dd></div>` : ""}
+        ${b.decisionNote ? `<div class="kv"><dt>Note</dt><dd>${esc(b.decisionNote)}</dd></div>` : ""}
+        <h3 class="mt">Payouts</h3>
+        <div class="table-scroll"><table class="data"><thead><tr><th>Payee</th><th>Via</th><th>Earned</th><th>Clawback</th><th>Carried</th><th>Paid (whole KES)</th><th>Status</th><th>M-PESA ref</th></tr></thead><tbody>${b.lines.map((l) => `<tr><td>${esc(l.payeeName)}<br><span class="small mono">${esc(l.payeeMsisdn || "no number")}</span></td><td>${esc(l.payoutMethod === "MPESA_B2C" ? "M-PESA B2C" : "M-PESA B2B")}</td><td>${moneyExact(l.earnedAmount)}</td><td>${moneyExact(l.clawbackAmount)}</td><td>${moneyExact(l.carriedForward)}</td><td><strong>${money(l.netAmount)}</strong></td><td>${statusChip(l.status)}</td><td class="mono">${esc(l.payoutReference || l.failureReason || "—")}</td></tr>`).join("")}</tbody></table></div>
+        ${pending ? `<div class="field mt"><label for="decision-note">Note (optional)</label><input id="decision-note" type="text" placeholder="e.g. checked against the ledger" /></div>
+          ${mine ? `<p class="small">You prepared this batch, so someone else must approve it (maker-checker).</p>` : ""}
+          <div class="btn-row"><button class="btn btn-primary btn-sm" id="batch-approve" ${mine ? "disabled" : ""}>Approve and pay out</button><button class="btn btn-danger btn-sm" id="batch-reject">Reject</button></div>` : ""}`);
+      const decide = async (action) => {
+        const note = document.getElementById("decision-note")?.value.trim() || undefined;
+        const ok = await confirmDialog({ title: action === "approve" ? "Approve and pay out?" : "Reject this batch?", message: action === "approve" ? `${money(b.totalAmount)} will be sent over M-PESA to ${b.lineCount} partners.` : "Nothing is paid; the commission returns to the next run.", danger: action === "reject" });
+        if (!ok) return;
+        try {
+          const r = await api(`/admin/settlements/${b.id}/${action}`, { method: "POST", body: { note } });
+          toast(action === "approve" ? `${r.batchNumber} ${r.status === "PAID" ? "paid out" : "partly paid"} over M-PESA.` : `${r.batchNumber} rejected.`, "success");
+          document.querySelector(".modal-close")?.click();
+          renderSettlements();
+        } catch (e) { toast(e.message || "Failed.", "error"); }
+      };
+      document.getElementById("batch-approve")?.addEventListener("click", () => decide("approve"));
+      document.getElementById("batch-reject")?.addEventListener("click", () => decide("reject"));
+    }
+  } catch (err) {
+    page().innerHTML = `<section class="wrap page-head"><div class="form-error">${esc(err.message || "Unable to load settlements.")}</div></section>`;
   }
 }
 

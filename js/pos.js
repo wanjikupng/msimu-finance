@@ -6,7 +6,7 @@
 // production that prompt appears on the customer's real handset and the
 // answer comes back on the M-PESA callback; here it is simulated.
 import { api, session } from "./api.js";
-import { esc, money, fmtDate, fmtDateTime } from "./ui.js";
+import { esc, money, moneyExact, fmtDate, fmtDateTime } from "./ui.js";
 
 const APP_VERSION = "msimu-pos 1.1.0";
 const POLL_MS = 2000;
@@ -78,7 +78,7 @@ function render() {
     },
     report: () => {
       const r = S.report;
-      return `${header("END OF DAY")}<div class="pos-body"><p class="pos-hint">${esc(fmtDate(r.businessDate))} · ${esc(r.terminalCode)}</p><table class="pos-table"><tr><td>Approved</td><td>${esc(String(r.approvedCount))}</td><td>${esc(money(r.approvedAmount))}</td></tr><tr><td>Declined</td><td>${esc(String(r.declinedCount))}</td><td></td></tr><tr><td>Waiting</td><td>${esc(String(r.pendingCount))}</td><td></td></tr></table><p class="pos-hint">All collections are already in M-PESA: no cash to count or hand over. Report printed.</p></div>${footer("", "OK Menu")}`;
+      return `${header("END OF DAY")}<div class="pos-body"><p class="pos-hint">${esc(fmtDate(r.businessDate))} · ${esc(r.terminalCode)}</p><table class="pos-table"><tr><td>Approved</td><td>${esc(String(r.approvedCount))}</td><td>${esc(money(r.approvedAmount))}</td></tr><tr><td>Declined</td><td>${esc(String(r.declinedCount))}</td><td></td></tr><tr><td>Waiting</td><td>${esc(String(r.pendingCount))}</td><td></td></tr><tr><td>My commission</td><td></td><td>${esc(moneyExact(r.commissionEarnedToday))}</td></tr></table><p class="pos-hint">All collections are already in M-PESA: no cash to count or hand over. Report printed.</p></div>${footer("", "OK Menu")}`;
     },
     boot: () => `${header("M-SIMU POS")}<div class="pos-body pos-center"><div class="pos-spinner"></div><p>Starting…</p></div>${footer("", "")}`,
   }[S.screen];
@@ -243,6 +243,7 @@ async function showReport() {
     slot.innerHTML = `<div class="pos-slip"><div class="slip-c"><b>${esc(S.report.merchantName)}</b><br>END OF DAY · ${esc(S.report.terminalCode)}</div><div class="slip-rule"></div>
       ${S.report.transactions.map((t) => `<div class="slip-row"><span>${esc(new Date(t.requestedAt).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" }))} ${esc(t.contractNumber)}</span><span>${esc(money(t.amount))} ${t.status === "POSTED" ? "OK" : esc(t.status)}</span></div>`).join("") || `<div class="slip-c">No collections today</div>`}
       <div class="slip-rule"></div><div class="slip-row slip-big"><span>APPROVED (${esc(String(S.report.approvedCount))})</span><span>${esc(money(S.report.approvedAmount))}</span></div>
+      <div class="slip-row"><span>COMMISSION TODAY</span><span>${esc(moneyExact(S.report.commissionEarnedToday))}</span></div>
       <div class="slip-c">Settled to M-PESA. No cash held.</div></div>`;
   } catch (e) { S.error = e.message; render(); }
 }

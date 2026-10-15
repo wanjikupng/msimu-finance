@@ -159,6 +159,22 @@ class CommissionSettlementIntegrationTest {
         assertThat(JsonPath.<List<String>>read(batch, "$.lines[?(@.payeeName == 'QuickMart Electronics')].payoutMethod"))
                 .containsOnly("MPESA_B2B");
         assertThat(entriesFor(ref)).allMatch(e -> e.getStatus() == CommissionStatus.IN_SETTLEMENT);
+        // 0.5% of 500 = KES 2.50 for QuickMart: the 50 cents wait for the next run.
+        assertThat(entryRepository.findAll().stream().anyMatch(e -> e.getCommissionType() == CommissionType.ROUNDING_CARRY
+                && e.getStatus() == CommissionStatus.ACCRUED && e.getAmount().signum() > 0)).isTrue();
+
+        // M-PESA pays whole shillings: each payout is rounded down and the cents
+        // are carried forward, so earned + clawbacks - carried = paid, exactly.
+        List<Number> nets = JsonPath.read(batch, "$.lines[*].netAmount");
+        List<Number> earned = JsonPath.read(batch, "$.lines[*].earnedAmount");
+        List<Number> clawbacks = JsonPath.read(batch, "$.lines[*].clawbackAmount");
+        List<Number> carried = JsonPath.read(batch, "$.lines[*].carriedForward");
+        for (int i = 0; i < nets.size(); i++) {
+            BigDecimal net = new BigDecimal(nets.get(i).toString());
+            assertThat(net.stripTrailingZeros().scale()).isLessThanOrEqualTo(0);
+            assertThat(new BigDecimal(earned.get(i).toString()).add(new BigDecimal(clawbacks.get(i).toString()))
+                    .subtract(new BigDecimal(carried.get(i).toString()))).isEqualByComparingTo(net);
+        }
 
         // The same commission cannot be put in a second batch.
         runSettlement(admin, 400);
@@ -180,6 +196,10 @@ class CommissionSettlementIntegrationTest {
         assertThat(JsonPath.<List<String>>read(body, "$.lines[?(@.payeeName == 'Amina Yusuf')].payoutReference").get(0))
                 .startsWith("MPESA-B2C-");
         assertThat(entriesFor(ref)).allMatch(e -> e.getStatus() == CommissionStatus.SETTLED);
+
+        String merchantView = getJson(loginAs("quickmart@tracom.local", "Merchant@1234"), "/api/v1/merchants/me/commissions");
+        assertThat(JsonPath.<List<String>>read(merchantView, "$.payouts[*].beneficiaryType")).containsOnly("MERCHANT");
+        assertThat(JsonPath.<List<String>>read(merchantView, "$.agents[*].name")).contains("Amina Yusuf");
 
         String mine = getJson(agent, "/api/v1/agents/me/commissions");
         assertThat(JsonPath.<Number>read(mine, "$.paidToDate").doubleValue()).isGreaterThanOrEqualTo(10.0);

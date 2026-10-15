@@ -5,6 +5,7 @@ import com.tracom.lipamdogo.dto.SettlementLineResponse;
 import com.tracom.lipamdogo.model.BeneficiaryType;
 import com.tracom.lipamdogo.model.CommissionEntry;
 import com.tracom.lipamdogo.model.CommissionStatus;
+import com.tracom.lipamdogo.model.CommissionType;
 import com.tracom.lipamdogo.model.SettlementBatch;
 import com.tracom.lipamdogo.model.SettlementBatchStatus;
 import com.tracom.lipamdogo.model.SettlementLine;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -37,7 +39,9 @@ import java.util.Map;
  *   <li><b>Run</b> (maker): every ACCRUED commission earned up to the cut-off
  *       is netted per partner (earnings minus clawbacks) into a payout line;
  *       those entries move to IN_SETTLEMENT so no other run can take them.
- *       A partner whose net is zero or negative is carried forward.</li>
+ *       M-PESA pays whole shillings, so the payout is rounded down and the
+ *       cents are carried into the next run (a ROUNDING_CARRY pair). A
+ *       partner owed less than KES 1 is carried forward entirely.</li>
  *   <li><b>Approve</b> (checker, a <em>different</em> staff member): each line
  *       is paid over M-PESA (B2C to the agent's phone, B2B to the merchant).
  *       Paid lines settle their entries; a failed line returns its entries to
@@ -95,9 +99,11 @@ public class SettlementService {
             BigDecimal clawback = group.stream().map(CommissionEntry::getAmount)
                     .filter(a -> a.signum() < 0).reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal net = earned.add(clawback);
-            if (net.signum() <= 0) {
-                continue; // carried forward: nothing is owed yet
+            BigDecimal payable = net.setScale(0, RoundingMode.FLOOR);
+            if (payable.signum() <= 0) {
+                continue; // carried forward: less than a shilling (or nothing) is owed yet
             }
+            BigDecimal cents = net.subtract(payable);
             CommissionEntry first = group.get(0);
             boolean agent = first.getBeneficiaryType() == BeneficiaryType.AGENT;
             SettlementLine line = new SettlementLine();
@@ -113,15 +119,22 @@ public class SettlementService {
             line.setEntryCount(group.size());
             line.setEarnedAmount(earned);
             line.setClawbackAmount(clawback);
-            line.setNetAmount(net);
+            line.setCarriedForward(cents);
+            line.setNetAmount(payable);
             line.setStatus(SettlementLineStatus.PENDING);
             line = lineRepository.save(line);
-            for (CommissionEntry e : group) {
+            List<CommissionEntry> settled = new ArrayList<>(group);
+            if (cents.signum() > 0) {
+                settled.add(roundingCarry(first, cents.negate(), CommissionStatus.IN_SETTLEMENT));
+                entryRepository.save(roundingCarry(first, cents, CommissionStatus.ACCRUED));
+            }
+            for (CommissionEntry e : settled) {
                 e.setStatus(CommissionStatus.IN_SETTLEMENT);
                 e.setSettlementLine(line);
             }
-            entryRepository.saveAll(group);
-            total = total.add(net);
+            entryRepository.saveAll(settled);
+            line.setEntryCount(group.size());
+            total = total.add(payable);
             lines++;
         }
         if (lines == 0) {
@@ -190,6 +203,19 @@ public class SettlementService {
     public SettlementBatchResponse get(Long batchId) {
         return toResponse(batchRepository.findById(batchId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement batch not found.")));
+    }
+
+    private static CommissionEntry roundingCarry(CommissionEntry like, BigDecimal amount, CommissionStatus status) {
+        CommissionEntry e = new CommissionEntry();
+        e.setBeneficiaryType(like.getBeneficiaryType());
+        e.setAgent(like.getAgent());
+        e.setMerchant(like.getMerchant());
+        e.setCommissionType(CommissionType.ROUNDING_CARRY);
+        e.setBaseAmount(BigDecimal.ZERO);
+        e.setAmount(amount);
+        e.setStatus(status);
+        e.setEarnedAt(SystemTime.now());
+        return e;
     }
 
     private void release(List<CommissionEntry> entries) {

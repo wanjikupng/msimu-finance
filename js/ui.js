@@ -14,6 +14,13 @@ export function money(value) {
   return "KES " + Math.round(n).toLocaleString("en-KE");
 }
 
+// "KES 8.52": for commission, where cents matter (payouts themselves are whole shillings).
+export function moneyExact(value) {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return "KES 0.00";
+  return "KES " + n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 const _dateFmt = new Intl.DateTimeFormat("en-KE", {
   timeZone: "Africa/Nairobi",
   day: "numeric",
@@ -91,6 +98,15 @@ const CHIP_CLASS = {
   PROVISIONED: "chip-grey",
   PAYMENT: "chip-green",
   REVERSAL: "chip-amber",
+  // settlement
+  PENDING_APPROVAL: "chip-amber",
+  PAID: "chip-green",
+  PARTIALLY_PAID: "chip-amber",
+  ACCRUED: "chip-indigo",
+  IN_SETTLEMENT: "chip-amber",
+  SETTLED: "chip-green",
+  AGENT: "chip-indigo",
+  MERCHANT: "chip-grey",
 };
 
 export function statusChip(status) {

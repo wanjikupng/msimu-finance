@@ -14,6 +14,7 @@ import com.tracom.lipamdogo.payment.ProviderStatementSimulator;
 import com.tracom.lipamdogo.repository.DeviceRepository;
 import com.tracom.lipamdogo.repository.FinancingApplicationRepository;
 import com.tracom.lipamdogo.repository.LoanContractRepository;
+import com.tracom.lipamdogo.repository.MerchantRepository;
 import com.tracom.lipamdogo.repository.PaymentPlanRepository;
 import com.tracom.lipamdogo.repository.ProductRepository;
 import com.tracom.lipamdogo.repository.TerminalRepository;
@@ -25,6 +26,7 @@ import com.tracom.lipamdogo.service.DeviceService;
 import com.tracom.lipamdogo.service.FinancingService;
 import com.tracom.lipamdogo.service.PaymentService;
 import com.tracom.lipamdogo.service.PosService;
+import com.tracom.lipamdogo.service.SettlementService;
 import com.tracom.lipamdogo.service.ReconciliationService;
 import com.tracom.lipamdogo.support.SystemTime;
 import org.slf4j.Logger;
@@ -81,6 +83,8 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
     private final ReconciliationService reconciliationService;
     private final TerminalRepository terminalRepository;
     private final PosService posService;
+    private final SettlementService settlementService;
+    private final MerchantRepository merchantRepository;
 
     private UserPrincipal officer;
     private int imeiSequence = 0;
@@ -100,7 +104,9 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
                                   ProviderStatementSimulator statementSimulator,
                                   ReconciliationService reconciliationService,
                                   TerminalRepository terminalRepository,
-                                  PosService posService) {
+                                  PosService posService,
+                                  SettlementService settlementService,
+                                  MerchantRepository merchantRepository) {
         this.enabled = enabled;
         this.userAccountRepository = userAccountRepository;
         this.loanContractRepository = loanContractRepository;
@@ -117,6 +123,8 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
         this.reconciliationService = reconciliationService;
         this.terminalRepository = terminalRepository;
         this.posService = posService;
+        this.settlementService = settlementService;
+        this.merchantRepository = merchantRepository;
     }
 
     @Override
@@ -142,7 +150,7 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
         //    it on her phone. Today she started a payment in the app that is
         //    still waiting for her PIN.
         UserAccount wanjiru = customer("Wanjiru Kamau", "wanjiru@demo.msimu", "+254711000201");
-        Long wanjiruContract = finance(wanjiru, newDevice("Tecno Camon 20"), "Standard 120 Days", "5000",
+        Long wanjiruContract = finance(wanjiru, stockedAt(newDevice("Tecno Camon 20"), "QuickMart Electronics"), "Standard 120 Days", "5000",
                 today.minusDays(30));
         for (int d = 29; d >= 2; d -= 3) {
             payAtTerminal(wanjiruContract, "426", at(today.minusDays(d), 12, 15), "TRM-0001", true);
@@ -158,7 +166,7 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
 
         // 4. Achieng: recent customer, missed the last few days (1-7 bucket).
         UserAccount achieng = customer("Achieng Atieno", "achieng@demo.msimu", "+254733000401");
-        Long achiengContract = finance(achieng, newDevice("Infinix Hot 40"), "Flex 200 Days", "3500",
+        Long achiengContract = finance(achieng, stockedAt(newDevice("Infinix Hot 40"), "TechPoint"), "Flex 200 Days", "3500",
                 today.minusDays(14));
         payDaily(achieng, achiengContract, today.minusDays(13), today.minusDays(4), "63", day -> true);
         // This morning agent Faith (TechPoint, TRM-0003) sent her a request; she declined it.
@@ -194,6 +202,14 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
         statementSimulator.importMpesaStatement(true);
         reconciliationService.run(null, null, null);
 
+        // Commission settlement: everything earned up to yesterday was paid out.
+        // Prepared by the payments operator, approved by the administrator
+        // (maker-checker), paid over M-PESA B2C/B2B. Today's commission is unpaid.
+        UserPrincipal maker = new UserPrincipal(userAccountRepository.findByEmail("payments@tracom.local").orElseThrow());
+        UserPrincipal checker = new UserPrincipal(userAccountRepository.findByEmail("admin@tracom.local").orElseThrow());
+        Long batchId = settlementService.run(today.minusDays(1), maker).id();
+        settlementService.approve(batchId, checker, "Daily commission run");
+
         // Terminal heartbeats: the three agents' terminals checked in at start-up;
         // the faulty one has been silent for over a week.
         for (String code : new String[]{"TRM-0001", "TRM-0002", "TRM-0003"}) {
@@ -226,6 +242,15 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
 
     private Long existingDevice(String code) {
         return deviceRepository.findByDeviceCode(code).orElseThrow().getId();
+    }
+
+    /** Marks a device as stock held by a merchant (it then earns that merchant the sale fee). */
+    private Long stockedAt(Long deviceId, String merchantName) {
+        var device = deviceRepository.findById(deviceId).orElseThrow();
+        device.setMerchant(merchantRepository.findAll().stream()
+                .filter(m -> m.getBusinessName().equals(merchantName)).findFirst().orElseThrow());
+        deviceRepository.save(device);
+        return deviceId;
     }
 
     private Long newDevice(String productName) {

@@ -19,6 +19,7 @@ The phone loan is the business story. Underneath it is the infrastructure Tracom
 | **Allocation ledger** | Every posted shilling is allocated to a specific day's installment; reversals replay the ledger instead of guessing |
 | **Device lock** | Each financed phone locks itself when payments stop. Every payment issues a signed 12-digit unlock code that the phone verifies **offline**; old codes can't be replayed and dates can't be edited |
 | **Agent terminals** | Cashless POS terminals at partner shops: the agent sends an **M-PESA STK push** to the customer's phone, the customer approves with their own PIN, and the terminal prints a receipt with the new unlock code. Terminal management console (online status, assignment, suspend/faulty, today's collections) |
+| **Commissions & settlement** | Agents earn a share of every M-PESA collection from their terminal, merchants an override plus a fee per phone financed from their stock. Append-only ledger with automatic clawbacks on reversal. Settlement batches need **two people** (maker-checker) and pay out over M-PESA B2C/B2B in whole shillings, carrying the cents forward |
 | **End-of-day** | Nightly arrears sweep moves contracts (and their devices) into and out of arrears; staff can run it on demand |
 | **Reconciliation** | Import the (simulated) M-PESA statement and match by provider reference: matched, amount/status mismatch, missing on either side, duplicates. Never changes a balance |
 | **Portals** | Customer portal, staff console (role-aware), partner portal for agents and merchants |
@@ -42,7 +43,7 @@ The database is in-memory and rebuilt on every start, including the demo portfol
 ### Run the tests
 
 ```bash
-mvn test        # 103 tests: unit + Spring integration tests
+mvn test        # 109 tests: unit + Spring integration tests
 ```
 
 ## Demo accounts
@@ -78,8 +79,9 @@ It then runs the arrears sweep, imports the simulated M-PESA statement (with two
 3. **Loan officer**: Applications → open the new one → Start review → Approve. The contract and device handover happen in one transaction.
 4. **Device lock.** As admin, open **Devices**, filter OVERDUE, open Otieno's Redmi and click **Load key into phone simulator**. The simulator opens showing the phone **locked**. Sign in as **Otieno** (`otieno@demo.msimu`) in another tab: Home shows *Phone lock: LOCKED*. Pay KES 1,876 to catch up and a **new unlock code** appears. Type it into the phone's keypad and it unlocks, with no server involved. Try it again and it's refused. Click *+3 days* a few times and the phone locks again.
 5. **Agent terminal (cashless).** Sign in as **Amina** (`amina.agent@tracom.local`) and click **Open terminal**, then sign in on the terminal. Press **1**, type Achieng's number `0733000401`, **OK**, then **1** to pick her contract. The amount due is filled in. Press **OK**, **OK** (her registered M-PESA number) and **OK** to send. The *customer's phone* panel shows the M-PESA prompt: enter any 4-digit PIN and **Send**. The terminal shows APPROVED and prints a receipt with the M-PESA reference and the phone's new unlock code. Try it again and press **Cancel** on the phone: NOT PAID, nothing applied. Press **3** for the end-of-day report.
-6. **Admin → Overview**: portfolio at risk, the collections chart, Needs attention. **Run end-of-day** re-evaluates arrears.
-7. **Payments operator → Reconciliation**: every M-PESA statement line matches (customer-app and agent-terminal payments alike) except two planted exceptions, an amount mismatch and an unknown paybill payment, which are flagged but never auto-corrected.
+6. **Commission settlement (maker-checker).** After Amina's collection, sign in as the **payments operator** (`payments@tracom.local`). Open **Settlements** and click **Prepare settlement** with today as the cut-off. The batch shows one M-PESA payout per partner, and **Approve** is disabled for you because you prepared it. Sign in as **admin**, open the batch and click **Approve and pay out**: each line gets an M-PESA B2C/B2B reference. Back in Amina's portal, *My commission* shows the payout.
+7. **Admin → Overview**: portfolio at risk, the collections chart, Needs attention. **Run end-of-day** re-evaluates arrears.
+8. **Payments operator → Reconciliation**: every M-PESA statement line matches (customer-app and agent-terminal payments alike) except two planted exceptions, an amount mismatch and an unknown paybill payment, which are flagged but never auto-corrected.
 
 ## Architecture
 
@@ -95,6 +97,8 @@ Payment engine → posting → allocations  (idempotent, reserved, reversible)
 End-of-day arrears sweep                (status only, never money)
         │
 Reconciliation vs provider statement    (evidence only, never money)
+        │
+Commissions → settlement                (maker-checker M-PESA B2C/B2B payouts)
 ```
 
 **Backend:** Spring Boot 3.3, Java 17, Spring Security + JWT, JPA/Hibernate, H2 (PostgreSQL mode).
@@ -139,6 +143,8 @@ All under `/api/v1`. Every endpoint except register and login needs `Authorizati
 | `/admin/devices/{id}/provisioning` | POST | ADMIN, TECHNICIAN | Device key for the lock agent |
 | `/pos/{terminal}/customers` · `/collections` · `/collections/{ref}/receipt` · `/day-summary` | GET/POST | assigned AGENT | Cashless M-PESA collection at a terminal |
 | `/admin/terminals` | GET/POST | ADMIN (read: PAYMENTS_OPERATOR) | Terminal management |
+| `/admin/commissions` · `/admin/settlements` (+ `/{id}/approve`, `/{id}/reject`) | GET/POST | ADMIN, PAYMENTS_OPERATOR | Commission ledger and maker-checker payouts |
+| `/agents/me/commissions` · `/merchants/me/commissions` | GET | AGENT, MERCHANT | Partner's own commission and payouts |
 | `/admin/devices`, `/admin/merchants`, `/admin/agents` | GET/POST | ADMIN | Inventory and network |
 
 ## Configuration
@@ -150,6 +156,8 @@ All under `/api/v1`. Every endpoint except register and login needs `Authorizati
 | `TRACOM_DEMO_PORTFOLIO` | `true` | Seed the demo portfolio |
 | `TRACOM_ARREARS_CRON` | `0 5 0 * * *` | When the nightly arrears sweep runs |
 | `TRACOM_LOCK_GRACE_DAYS` | `2` | Days after a missed due date before the phone locks |
+| `TRACOM_AGENT_COMMISSION_RATE` / `_CAP` | `0.02` / `50` | Agent's share of each terminal collection, capped per payment |
+| `TRACOM_MERCHANT_COMMISSION_RATE` / `TRACOM_MERCHANT_SALE_FEE` | `0.005` / `300` | Merchant's override and fee per phone financed from its stock |
 | `TRACOM_SIMULATED_CUSTOMER_PHONE` | `true` | Lets the terminal play the customer's phone answering the M-PESA prompt. Set `false` with a live M-PESA callback |
 
 ## Documentation
@@ -164,11 +172,12 @@ Design notes per phase, in [`docs/`](docs):
 6. [Operations hardening: end-of-day, terms, demo portfolio](docs/PHASE5.5-OPERATIONS.md)
 7. [Pay-as-you-go device lock](docs/PHASE6-DEVICE-LOCK.md)
 8. [Cashless agent terminals](docs/PHASE7-AGENT-TERMINALS.md)
+9. [Commissions and settlement](docs/PHASE8-SETTLEMENT-COMMISSIONS.md)
 
 ## Roadmap
 
 - **Earned grace days:** a good payment streak earns extra days before the phone locks.
-- **Settlement & commissions:** daily merchant settlement from the M-PESA collections, and agent commissions per terminal collection.
+- **Payout reconciliation:** match settlement payouts against the M-PESA B2C/B2B statement, the same way collections are reconciled.
 - **Live M-PESA sandbox:** swap the mock adapter for Safaricom Daraja (STK Push, C2B).
 
 ## License

@@ -365,6 +365,7 @@ CREATE TABLE IF NOT EXISTS settlement_lines (
     entry_count INTEGER NOT NULL,
     earned_amount DECIMAL(19,2) NOT NULL,
     clawback_amount DECIMAL(19,2) NOT NULL,
+    carried_forward DECIMAL(19,2) NOT NULL DEFAULT 0,
     net_amount DECIMAL(19,2) NOT NULL,
     status VARCHAR(20) NOT NULL,
     payout_reference VARCHAR(64) UNIQUE,

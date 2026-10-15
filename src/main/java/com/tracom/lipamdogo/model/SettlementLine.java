@@ -63,6 +63,10 @@ public class SettlementLine {
     @Column(name = "clawback_amount", nullable = false)
     private BigDecimal clawbackAmount;
 
+    /** Cents carried to the next settlement because M-PESA pays whole shillings. */
+    @Column(name = "carried_forward", nullable = false)
+    private BigDecimal carriedForward = BigDecimal.ZERO;
+
     @Column(name = "net_amount", nullable = false)
     private BigDecimal netAmount;
 
@@ -204,5 +208,13 @@ public class SettlementLine {
 
     public void setPaidAt(LocalDateTime paidAt) {
         this.paidAt = paidAt;
+    }
+
+    public BigDecimal getCarriedForward() {
+        return carriedForward;
+    }
+
+    public void setCarriedForward(BigDecimal carriedForward) {
+        this.carriedForward = carriedForward;
     }
 }
