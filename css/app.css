@@ -289,26 +289,40 @@ table.data tr.clickable { cursor: pointer; }
 .tabbar.admin-tabbar { justify-content: flex-start; overflow-x: auto; }
 .tabbar.admin-tabbar a { flex: 0 0 auto; }
 .rail { display: none; }
+
+/* ---------- portal shell (customer + staff) ----------
+   Mobile: top bar, page, fixed bottom tab bar.
+   Desktop: top bar spans the full width; sticky side rail on the left,
+   page content on the right. Every shell child is placed explicitly so
+   nothing (modals, toasts) can fall into the wrong grid cell. */
 @media (min-width: 860px) {
   .tabbar { display: none; }
-  .portal { display: grid; grid-template-columns: 220px 1fr; gap: 1.25rem; align-items: start; }
-  .rail {
-    display: block; position: sticky; top: 4.2rem;
+  .portal, .staff {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 1.5rem;
+    min-height: 100vh;
+  }
+  .portal > .topbar, .staff > .topbar { grid-column: 1 / -1; grid-row: 1; }
+  .portal .topbar-inner, .staff .topbar-inner { max-width: none; padding-left: 1.25rem; padding-right: 1.5rem; }
+  .portal > .rail, .staff > .rail {
+    grid-column: 1; grid-row: 2; align-self: start;
+    display: block; position: sticky; top: 4.6rem;
+    margin: 1.25rem 0 1.25rem 1rem;
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-l);
     padding: 0.75rem;
   }
+  .portal > main, .staff > main { grid-column: 2; grid-row: 2; min-width: 0; }
+  .portal > main .wrap, .staff > main .wrap { margin-left: 0; padding-right: 1.5rem; }
   .rail a {
     display: block; padding: 0.6rem 0.75rem; border-radius: var(--radius-m);
     color: var(--slate); text-decoration: none; font-weight: 600;
   }
+  .rail a:hover { background: var(--paper); color: var(--ink); }
   .rail a[aria-current="page"] { background: var(--charge-tint); color: var(--charge); }
-}
-
-/* ---------- staff console ---------- */
-.staff { display: block; }
-@media (min-width: 960px) {
-  .staff { display: grid; grid-template-columns: 230px 1fr; gap: 1.25rem; align-items: start; }
-  .staff .rail { display: block; }
+  .rail h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.75rem 0 0.35rem; padding: 0 0.75rem; }
+  .rail h3:first-child { margin-top: 0.25rem; }
 }
 .kpis { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, 1fr); }
 @media (min-width: 860px) { .kpis { grid-template-columns: repeat(3, 1fr); } }

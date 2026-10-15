@@ -151,7 +151,7 @@ async function renderOverview() {
     // Needs attention — every item deep-links to the filtered tab and,
     // where it names a single record, auto-opens its detail drawer.
     const overdueItems = overdueContracts.map((c) => ({ text: `${esc(c.customerName || "")} · ${esc(c.productName || "")} ${esc(String(Math.ceil(Math.max(0, (new Date() - new Date(c.nextPaymentDueDate)) / 86400000))))} days late`, href: `#/customers`, open: c.customerId != null ? { section: "#/customers", open: String(c.customerId) } : null }));
-    const pendingApps = Array.isArray(apps) ? [
+    const pendingApps = apps && apps.submitted + apps.underReview > 0 ? [
       { text: `${apps.submitted + apps.underReview} applications pending review`, href: "#/applications?status=SUBMITTED", open: null },
     ] : [];
     const pendingPayments = allPayments
@@ -179,7 +179,7 @@ async function renderOverview() {
         <div class="grid-2 mt" style="gap:1rem">
           <div class="card">
             <h3>Applications funnel</h3>
-            ${Array.isArray(apps) ? `<div class="funnel">
+            ${apps ? `<div class="funnel">
               <div class="funnel-step"><strong>${esc(String(apps.submitted))}</strong><span>Submitted</span></div>
               <div class="funnel-step"><strong>${esc(String(apps.underReview))}</strong><span>Review</span></div>
               <div class="funnel-step"><strong>${esc(String(apps.approved))}</strong><span>Approved</span></div>
