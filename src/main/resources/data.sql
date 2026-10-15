@@ -1,3 +1,5 @@
+DELETE FROM unlock_codes;
+DELETE FROM device_lock_keys;
 DELETE FROM reconciliation_records;
 DELETE FROM reconciliation_batches;
 DELETE FROM provider_transactions;
