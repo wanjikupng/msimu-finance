@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M-Simu Finance — Pay as you go phones</title>
+  <meta name="description" content="Choose a phone, pay a deposit, pay a little daily, and watch it become yours." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" aria-label="M-Simu Finance home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">M-Simu Finance</span>
+      </a>
+      <span class="topbar-spa"></span>
+      <a class="btn btn-ghost" href="login.html">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="signup.html">Create account</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <h1>Pay a little daily.<br />Own your phone.</h1>
+          <p>Pick a phone, pay a deposit, then pay what you can each day. Your phone charges up as you pay — miss too many days and it locks until you catch up.</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="signup.html">Create account</a>
+            <a class="btn btn-secondary" href="login.html">Sign in</a>
+          </div>
+          <p class="small">No paperwork visits. Everything happens on your phone.</p>
+        </div>
+
+        <div class="calc" aria-label="Illustrative payment calculator">
+          <h2 style="font-size:1.2rem">Try it: drag the days</h2>
+          <div class="field">
+            <label for="calc-phone">Phone</label>
+            <select id="calc-phone"></select>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="calc-deposit">Deposit (KES)</label>
+              <input id="calc-deposit" type="number" min="1000" step="250" value="4000" />
+            </div>
+            <div class="field">
+              <label for="calc-daily">Daily payment (KES <span id="calc-daily-val">70</span>)</label>
+              <input id="calc-daily" type="range" min="30" max="150" step="5" value="70" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="calc-day">Day <span id="calc-day-val">0</span></label>
+            <input id="calc-day" type="range" min="0" max="200" step="1" value="0" />
+          </div>
+          <div class="calc-output">
+            <div id="calc-phone-stage" class="phone-figure" aria-hidden="true"></div>
+            <div>
+              <div class="bignum" id="calc-pct" style="font-size:2rem">0% paid</div>
+              <div id="calc-lines" class="small"></div>
+            </div>
+          </div>
+          <p class="small">Illustrative; exact terms are quoted when you apply.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li><strong>Apply.</strong><br />Choose a phone, a deposit and a daily plan. You get an exact quote before anything is signed.</li>
+          <li><strong>Sign.</strong><br />E-sign your contract on your phone and confirm you understand the lock rule.</li>
+          <li><strong>Get approved.</strong><br />A loan officer reviews your application, usually the same day.</li>
+          <li><strong>Pay daily.</strong><br />Pay any amount any day. Every shilling counts toward owning your phone.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section section-muted">
+      <div class="wrap">
+        <h2>Why it is different</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Transparent total cost</h3>
+            <p>You see the full price, the deposit, the financed amount and the day you will own it — before you sign. No interest is added on top.</p>
+          </div>
+          <div class="card">
+            <h3>Pay any amount, any day</h3>
+            <p>Had a good day? Pay extra and finish early. Had a slow day? Pay less — partial payments still count, never discarded.</p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:1rem">
+          <h3>See exactly when you will own it</h3>
+          <p>Your phone screen fills as you pay, with a live percentage, balance and estimated finish date. No statements to decode.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <h2>Built on Tracom payment rails</h2>
+        <p>M-Simu Finance runs on payment infrastructure from Tracom Services Limited, a Kenyan payments company.</p>
+        <ul class="rail-list">
+          <li><span class="chip chip-indigo rail-tag">Tracom: alternative banking channels</span><h3 class="mt">Pay without a smartphone app</h3><p>Dial <span class="mono">*456#</span> from any phone to check your balance, pay, or see your next due date over USSD.</p></li>
+          <li><span class="chip chip-indigo rail-tag">Tracom: e-signing</span><h3 class="mt">Sign contracts anywhere</h3><p>Contracts are signed electronically on your own device — no branch visit, no paper.</p></li>
+          <li><span class="chip chip-indigo rail-tag">Tracom: agency banking</span><h3 class="mt">Agents where you are</h3><p>Local agents register customers, hand over phones and accept payments on the platform's behalf.</p></li>
+          <li><span class="chip chip-indigo rail-tag">Tracom: terminal management</span><h3 class="mt">Every device tracked</h3><p>Each financed phone is tracked by IMEI and serial number in a fleet-style inventory, like payment terminals.</p></li>
+          <li><span class="chip chip-indigo rail-tag">Tracom: reporting</span><h3 class="mt">Collections you can audit</h3><p>Every payment posts as a traceable transaction with a receipt — collections, arrears and risk, all reportable.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section-muted">
+      <div class="wrap" style="text-align:center">
+        <h2>Ready when you are</h2>
+        <p>Create an account in a minute, or sign in to continue paying.</p>
+        <div class="btn-row" style="justify-content:center">
+          <a class="btn btn-primary" href="signup.html">Create account</a>
+          <a class="btn btn-secondary" href="login.html">Sign in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p><strong>M-Simu Finance</strong> — a Tracom Academy demonstration. Illustrative figures on this page are not offers of credit.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/landing.js"></script>
+</body>
+</html>

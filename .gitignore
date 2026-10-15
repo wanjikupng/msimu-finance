@@ -1,0 +1,12 @@
+# Build output
+target/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Logs and local env
+*.log
+.env

@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: lipa-mdogo-postgres
+    environment:
+      POSTGRES_DB: lipamdogo
+      POSTGRES_USER: lipa
+      POSTGRES_PASSWORD: lipa123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

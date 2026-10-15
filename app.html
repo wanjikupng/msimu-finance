@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M-Simu Finance — My portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body class="portal" data-role="CUSTOMER">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="app.html" aria-label="M-Simu Finance customer portal">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">M-Simu Finance</span>
+      </a>
+      <span class="topbar-spa"></span>
+      <span class="user-chip" id="user-name">Loading…</span>
+      <button class="btn btn-secondary btn-sm" type="button" id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Customer navigation" id="rail"></nav>
+
+  <main id="page" class="page" role="main"></main>
+
+  <nav class="tabbar" aria-label="Customer navigation" id="tabbar"></nav>
+
+  <script type="module" src="js/customer.js"></script>
+</body>
+</html>

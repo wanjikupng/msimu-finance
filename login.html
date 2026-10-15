@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — M-Simu Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <main class="split">
+    <div class="split-brand">
+      <a class="brand" href="index.html" style="color:#fff" aria-label="M-Simu Finance home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">M-Simu Finance</span>
+      </a>
+      <h1>Welcome back.</h1>
+      <p>Sign in to see exactly how much of your phone is yours.</p>
+      <div id="brand-phone" class="phone-figure" aria-hidden="true"></div>
+    </div>
+
+    <div class="split-form">
+      <h2>Sign in</h2>
+      <p class="small">New here? <a href="signup.html">Create an account</a></p>
+      <div id="form-error" class="form-error hidden" role="alert"></div>
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" data-field="email" type="email" name="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="password-wrap">
+            <input id="password" data-field="password" type="password" name="password" autocomplete="current-password" required />
+            <button type="button" class="password-toggle" data-toggle="password" aria-label="Show password">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="submit-btn">Sign in</button>
+      </form>
+
+      <details class="demo-box">
+        <summary>Demo accounts</summary>
+        <p class="small">One click fills the form with a development seed account.</p>
+        <div class="demo-accounts" id="demo-accounts"></div>
+      </details>
+    </div>
+  </main>
+
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>

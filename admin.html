@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Console — M-Simu Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body class="staff" data-role="STAFF">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="admin.html" aria-label="Staff console">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">M-Simu Staff</span>
+      </a>
+      <span class="topbar-spa"></span>
+      <span class="user-chip" id="user-name">Loading…</span>
+      <button class="btn btn-secondary btn-sm" type="button" id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Staff navigation" id="rail"></nav>
+
+  <nav class="tabbar admin-tabbar" aria-label="Staff navigation" id="tabbar"></nav>
+
+  <main id="page" class="page" role="main"></main>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

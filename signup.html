@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create account — M-Simu Finance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <main class="split">
+    <div class="split-brand">
+      <a class="brand" href="index.html" style="color:#fff" aria-label="M-Simu Finance home">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span class="brand-name">M-Simu Finance</span>
+      </a>
+      <h1>Own your phone, daily.</h1>
+      <p>One account for applying, signing, paying and watching your phone charge up.</p>
+      <div id="brand-phone" class="phone-figure" aria-hidden="true"></div>
+    </div>
+
+    <div class="split-form">
+      <h2>Create account</h2>
+      <p class="small">Already have one? <a href="login.html">Sign in</a></p>
+      <div id="form-error" class="form-error hidden" role="alert"></div>
+      <form id="signup-form" novalidate>
+        <div class="field">
+          <label for="fullName">Full name</label>
+          <input id="fullName" data-field="fullName" type="text" name="fullName" autocomplete="name" required />
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" data-field="email" type="email" name="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="phoneNumber">Phone number</label>
+          <input id="phoneNumber" data-field="phoneNumber" type="tel" name="phoneNumber" autocomplete="tel"
+                 placeholder="0712 345 678" required />
+          <span class="hint" id="phone-preview">Kenyan mobile number, e.g. 0712 345 678.</span>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="password-wrap">
+            <input id="password" data-field="password" type="password" name="password" autocomplete="new-password" required />
+            <button type="button" class="password-toggle" data-toggle="password" aria-label="Show password">Show</button>
+          </div>
+          <ul class="checklist" id="password-checklist" aria-live="polite">
+            <li data-rule="length">8 to 100 characters</li>
+            <li data-rule="letter">At least one letter</li>
+            <li data-rule="digit">At least one digit</li>
+          </ul>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="submit-btn">Create account</button>
+      </form>
+    </div>
+  </main>
+
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>
