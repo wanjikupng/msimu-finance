@@ -18,6 +18,7 @@ public record PosDaySummaryResponse(
         BigDecimal approvedAmount,
         long declinedCount,
         long pendingCount,
+        BigDecimal commissionEarnedToday,
         List<PaymentTransactionResponse> transactions
 ) {
 }

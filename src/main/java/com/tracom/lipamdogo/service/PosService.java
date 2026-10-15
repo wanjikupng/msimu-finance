@@ -25,6 +25,7 @@ import com.tracom.lipamdogo.repository.PaymentTransactionRepository;
 import com.tracom.lipamdogo.repository.TerminalRepository;
 import com.tracom.lipamdogo.repository.UserAccountRepository;
 import com.tracom.lipamdogo.security.UserPrincipal;
+import com.tracom.lipamdogo.support.Msisdn;
 import com.tracom.lipamdogo.support.SystemTime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,7 @@ public class PosService {
     private final PaymentService paymentService;
     private final DeviceLockService deviceLockService;
     private final TerminalService terminalService;
+    private final CommissionService commissionService;
     private final boolean simulatedCustomerPhone;
 
     public PosService(TerminalRepository terminalRepository,
@@ -73,6 +75,7 @@ public class PosService {
                       PaymentService paymentService,
                       DeviceLockService deviceLockService,
                       TerminalService terminalService,
+                      CommissionService commissionService,
                       @Value("${app.payments.simulated-customer-phone:true}") boolean simulatedCustomerPhone) {
         this.terminalRepository = terminalRepository;
         this.agentRepository = agentRepository;
@@ -83,6 +86,7 @@ public class PosService {
         this.paymentService = paymentService;
         this.deviceLockService = deviceLockService;
         this.terminalService = terminalService;
+        this.commissionService = commissionService;
         this.simulatedCustomerPhone = simulatedCustomerPhone;
     }
 
@@ -229,6 +233,7 @@ public class PosService {
         long pending = txns.stream().filter(t -> t.getStatus() == PaymentTransactionStatus.PENDING).count();
         return new PosDaySummaryResponse(terminal.getTerminalCode(), terminal.getMerchant().getBusinessName(),
                 terminal.getAgent().getUserAccount().getFullName(), day, approved, approvedAmount, declined, pending,
+                commissionService.earnedTodayByAgent(terminal.getAgent().getId()),
                 txns.stream().map(terminalService::toTransactionResponse).toList());
     }
 
@@ -309,22 +314,8 @@ public class PosService {
         return owed.max(BigDecimal.ZERO).min(c.getAmountRemaining());
     }
 
-    /** "0712 345 678", "+254712345678", "712345678" → "254712345678". */
     static String normalizeMsisdn(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String digits = raw.replaceAll("\\D", "");
-        if (digits.startsWith("254") && digits.length() == 12) {
-            return digits;
-        }
-        if (digits.startsWith("0") && digits.length() == 10) {
-            return "254" + digits.substring(1);
-        }
-        if (digits.length() == 9 && (digits.startsWith("7") || digits.startsWith("1"))) {
-            return "254" + digits;
-        }
-        return null;
+        return Msisdn.normalize(raw);
     }
 
     /** "Otieno Ouma" → "Otieno O." */

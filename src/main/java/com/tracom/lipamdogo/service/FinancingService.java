@@ -57,6 +57,7 @@ public class FinancingService {
     private final UserAccountRepository userAccountRepository;
     private final DeviceService deviceService;
     private final DeviceLockService deviceLockService;
+    private final CommissionService commissionService;
     private final FinancingCalculationService calculationService;
 
     public FinancingService(FinancingApplicationRepository applicationRepository,
@@ -67,6 +68,7 @@ public class FinancingService {
                             UserAccountRepository userAccountRepository,
                             DeviceService deviceService,
                             DeviceLockService deviceLockService,
+                            CommissionService commissionService,
                             FinancingCalculationService calculationService) {
         this.applicationRepository = applicationRepository;
         this.loanContractRepository = loanContractRepository;
@@ -76,6 +78,7 @@ public class FinancingService {
         this.userAccountRepository = userAccountRepository;
         this.deviceService = deviceService;
         this.deviceLockService = deviceLockService;
+        this.commissionService = commissionService;
         this.calculationService = calculationService;
     }
 
@@ -275,6 +278,7 @@ public class FinancingService {
 
         deviceService.handoverToCustomer(device.getId(), application.getCustomer().getId());
         deviceLockService.provision(saved);
+        commissionService.onContractApproved(saved);
 
         application.setStatus(ApplicationStatus.APPROVED);
         application.setApprovedPrincipal(application.getRequestedPrincipal());

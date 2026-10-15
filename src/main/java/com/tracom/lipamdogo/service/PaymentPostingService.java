@@ -46,19 +46,22 @@ public class PaymentPostingService {
     private final LoanContractRepository loanContractRepository;
     private final DeviceService deviceService;
     private final DeviceLockService deviceLockService;
+    private final CommissionService commissionService;
 
     public PaymentPostingService(PaymentTransactionRepository transactionRepository,
                                  PaymentReceiptRepository receiptRepository,
                                  PaymentAllocationRepository allocationRepository,
                                  LoanContractRepository loanContractRepository,
                                  DeviceService deviceService,
-                                 DeviceLockService deviceLockService) {
+                                 DeviceLockService deviceLockService,
+                                 CommissionService commissionService) {
         this.transactionRepository = transactionRepository;
         this.receiptRepository = receiptRepository;
         this.allocationRepository = allocationRepository;
         this.loanContractRepository = loanContractRepository;
         this.deviceService = deviceService;
         this.deviceLockService = deviceLockService;
+        this.commissionService = commissionService;
     }
 
     /**
@@ -118,6 +121,7 @@ public class PaymentPostingService {
 
         refreshLoanState(contract);
         deviceLockService.refresh(contract, transaction, false);
+        commissionService.onPaymentPosted(transaction);
 
         PaymentReceipt receipt = new PaymentReceipt();
         receipt.setTransaction(transaction);
@@ -185,6 +189,7 @@ public class PaymentPostingService {
 
         refreshLoanState(contract);
         deviceLockService.refresh(contract, transaction, true);
+        commissionService.onPaymentReversed(transaction);
         return transaction;
     }
 

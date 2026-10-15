@@ -1,3 +1,6 @@
+DELETE FROM commission_entries;
+DELETE FROM settlement_lines;
+DELETE FROM settlement_batches;
 DELETE FROM unlock_codes;
 DELETE FROM device_lock_keys;
 DELETE FROM reconciliation_records;
