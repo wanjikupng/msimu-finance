@@ -84,9 +84,21 @@ function wirePhonePreview() {
   input.addEventListener("input", update);
 }
 
+function isLocalDevelopmentHost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
 function wireDemoAccounts() {
   const box = document.getElementById("demo-accounts");
   if (!box) return;
+  // The one-click accounts are the documented development defaults. They must
+  // never appear on a hosted deployment: the operator sets private seed
+  // passwords there, and pre-filling publicly known values would be both
+  // wrong and a disclosure. Local development keeps the convenience.
+  if (!isLocalDevelopmentHost()) {
+    box.closest(".demo-box")?.remove();
+    return;
+  }
   // esc() every label: these strings are ours today, but the helper makes
   // the pattern impossible to forget when the list grows.
   box.innerHTML = DEMO_ACCOUNTS.map(

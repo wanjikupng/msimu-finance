@@ -13,14 +13,16 @@ SPRING_PROFILES_ACTIVE=prod
 # Random value of at least 32 bytes. Generate with: openssl rand -base64 48
 TRACOM_JWT_SECRET=<generate-a-random-32-byte-or-longer-secret>
 
-# Seed credentials (academy demo accounts). Use the documented demo values so
-# assessors can sign in with the accounts printed in README.md, or choose your
-# own and update the login-page hints in js/config.js.
-TRACOM_ADMIN_PASSWORD=<demo-admin-password>
-TRACOM_DEMO_PASSWORD=<demo-customer-password>
-TRACOM_STAFF_PASSWORD=<demo-staff-password>
-TRACOM_AGENT_PASSWORD=<demo-agent-password>
-TRACOM_MERCHANT_PASSWORD=<demo-merchant-password>
+# Seed credentials (academy demo accounts).
+# Use PRIVATE values for a public deployment: do not reuse the development
+# defaults printed in README.md. Generate with e.g. `openssl rand -base64 18`
+# and keep them outside the repository. The login page's one-click demo buttons
+# only appear on localhost, so nothing is pre-filled on the hosted site.
+TRACOM_ADMIN_PASSWORD=<private-admin-password>
+TRACOM_DEMO_PASSWORD=<private-customer-password>
+TRACOM_STAFF_PASSWORD=<private-staff-password>
+TRACOM_AGENT_PASSWORD=<private-agent-password>
+TRACOM_MERCHANT_PASSWORD=<private-merchant-password>
 
 # Synthetic demo book of business (40 days) on first boot.
 TRACOM_DEMO_PORTFOLIO=true
