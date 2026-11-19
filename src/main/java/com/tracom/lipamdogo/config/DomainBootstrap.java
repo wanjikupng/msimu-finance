@@ -75,6 +75,11 @@ public class DomainBootstrap implements ApplicationRunner {
         if (merchantRepository.count() > 0 || agentRepository.count() > 0 || deviceRepository.count() > 0) {
             return;
         }
+        if (isBlank(agentPassword) || isBlank(merchantPassword)) {
+            log.warn("Skipping the development domain seed: TRACOM_AGENT_PASSWORD / "
+                    + "TRACOM_MERCHANT_PASSWORD is blank.");
+            return;
+        }
 
         UserAccount quickMartOwner = ensureUser("QuickMart Owner", "quickmart@tracom.local",
                 "+254700000101", merchantPassword, Role.MERCHANT, "C-MRCQ01");
@@ -193,5 +198,9 @@ public class DomainBootstrap implements ApplicationRunner {
         terminal.setStatus(status);
         terminal.setAppVersion("msimu-pos 1.0.0");
         terminalRepository.save(terminal);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

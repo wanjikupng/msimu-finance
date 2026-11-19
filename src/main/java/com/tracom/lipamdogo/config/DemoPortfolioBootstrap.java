@@ -64,10 +64,10 @@ import java.util.function.IntPredicate;
 public class DemoPortfolioBootstrap implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoPortfolioBootstrap.class);
-    private static final String STAFF_PASSWORD = "Staff@1234";
-    private static final String CUSTOMER_PASSWORD = "Demo@1234";
 
     private final boolean enabled;
+    private final String staffPassword;
+    private final String customerPassword;
     private final UserAccountRepository userAccountRepository;
     private final LoanContractRepository loanContractRepository;
     private final FinancingApplicationRepository applicationRepository;
@@ -90,6 +90,8 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
     private int imeiSequence = 0;
 
     public DemoPortfolioBootstrap(@Value("${app.demo.portfolio.enabled:false}") boolean enabled,
+                                  @Value("${app.bootstrap.staff.password:Staff@1234}") String staffPassword,
+                                  @Value("${app.bootstrap.demo-customer.password:Demo@1234}") String customerPassword,
                                   UserAccountRepository userAccountRepository,
                                   LoanContractRepository loanContractRepository,
                                   FinancingApplicationRepository applicationRepository,
@@ -108,6 +110,8 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
                                   SettlementService settlementService,
                                   MerchantRepository merchantRepository) {
         this.enabled = enabled;
+        this.staffPassword = staffPassword;
+        this.customerPassword = customerPassword;
         this.userAccountRepository = userAccountRepository;
         this.loanContractRepository = loanContractRepository;
         this.applicationRepository = applicationRepository;
@@ -131,6 +135,11 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!enabled || loanContractRepository.count() > 0 || applicationRepository.count() > 0) {
             return;
+        }
+        if (isBlank(staffPassword) || isBlank(customerPassword)) {
+            throw new IllegalStateException(
+                    "The demo portfolio is enabled but TRACOM_STAFF_PASSWORD / TRACOM_DEMO_PASSWORD is blank. "
+                            + "Set both passwords or disable the portfolio with TRACOM_DEMO_PORTFOLIO=false.");
         }
         LocalDate today = SystemTime.today();
 
@@ -228,14 +237,14 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
 
     private UserAccount staff(String name, String email, String phone, Role role) {
         return userAccountRepository.findByEmail(email).orElseGet(() -> {
-            adminService.createUser(new AdminUserRequest(name, email, phone, STAFF_PASSWORD, role));
+            adminService.createUser(new AdminUserRequest(name, email, phone, staffPassword, role));
             return userAccountRepository.findByEmail(email).orElseThrow();
         });
     }
 
     private UserAccount customer(String name, String email, String phone) {
         return userAccountRepository.findByEmail(email).orElseGet(() -> {
-            adminService.createUser(new AdminUserRequest(name, email, phone, CUSTOMER_PASSWORD, Role.CUSTOMER));
+            adminService.createUser(new AdminUserRequest(name, email, phone, customerPassword, Role.CUSTOMER));
             return userAccountRepository.findByEmail(email).orElseThrow();
         });
     }
@@ -321,5 +330,9 @@ public class DemoPortfolioBootstrap implements ApplicationRunner {
 
     private static LocalDateTime at(LocalDate day, int hour, int minute) {
         return LocalDateTime.of(day, LocalTime.of(hour, minute));
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

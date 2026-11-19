@@ -54,7 +54,7 @@ From the `msimu-finance` folder:
 mvn test
 ```
 
-Expected: `Tests run: 109, Failures: 0, Errors: 0` and **BUILD SUCCESS**.
+Expected: `Tests run: 113, Failures: 0, Errors: 0` and **BUILD SUCCESS**.
 The first run downloads libraries and takes a few minutes.
 
 | Test class | What it proves |
@@ -69,20 +69,24 @@ The first run downloads libraries and takes a few minutes.
 | `MerchantAgentDeviceIntegrationTest` | Merchants, agents, device lifecycle |
 | `AgentTerminalIntegrationTest` | Cashless STK push collections at terminals |
 | `CommissionSettlementIntegrationTest` | Commission, clawbacks, maker-checker payouts |
+| `DeploymentSurfaceIntegrationTest` | Public health probe, static pages/assets, protected API, seeded login |
 
 ## 4. Start the system
 
-Two terminals, both in the project folder:
+One terminal, in the project folder:
 
 ```bash
-# Terminal 1 — backend (wait for "Started LipaMdogoApplication")
+# Backend + web pages on http://localhost:8080 (wait for "Started LipaMdogoApplication")
 mvn spring-boot:run
-
-# Terminal 2 — web pages
-python -m http.server 8000      # Windows: py -m http.server 8000
 ```
 
-Open **http://localhost:8000** in Chrome.
+Open **http://localhost:8080** in Chrome.
+
+Spring Boot now serves the pages itself (they are packaged into the jar), so
+there is no second server to start. If you prefer a separate static file
+server, run `python -m http.server 8000` and set
+`window.MSIMU_API_BASE = "http://localhost:8080/api/v1"` before `js/config.js`
+loads; otherwise the pages will call `/api/v1` on port 8000.
 
 In IntelliJ you can instead open the folder and run `LipaMdogoApplication`.
 
@@ -112,7 +116,7 @@ people at once.
 
 1. On the landing page click **Sign up** and create a customer. You land in the customer portal.
 2. Sign out and log in with a wrong password. You get an error.
-3. Logged in as `demo@lipamdogo.com`, open `http://localhost:8000/admin.html`. A customer does **not** get the staff console.
+3. Logged in as `demo@lipamdogo.com`, open `http://localhost:8080/admin.html`. A customer does **not** get the staff console.
 4. Open `http://localhost:8080/api/v1/admin/payments` in the browser. Refused (401): no login token.
 
 ### B. Customer portal (`demo@lipamdogo.com`)

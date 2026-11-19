@@ -26,24 +26,23 @@ The phone loan is the business story. Underneath it is the infrastructure Tracom
 
 ## Quick start
 
-Requirements: Java 17+, Maven 3.9+, Python 3 (only to serve the static frontend).
+Requirements: Java 17+, Maven 3.9+.
 
 ```bash
-# 1. Backend (port 8080)
+# One process serves the frontend and the API (single origin, port 8080)
 mvn spring-boot:run
-
-# 2. Frontend (second terminal, port 8000)
-python3 -m http.server 8000
 ```
 
-Open **http://localhost:8000**. The API is at `http://localhost:8080/api/v1`; the H2 console is at `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:lipamdogo`, user `sa`, no password).
+Open **http://localhost:8080**. The API is at `http://localhost:8080/api/v1`; the H2 console is at `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:lipamdogo`, user `sa`, no password).
+
+The frontend has no build step. Its HTML/CSS/ES modules live at the repository root and are packaged into the jar (`target/classes/static`) by `maven-resources-plugin`, so Spring Boot serves the pages and the API from the same origin — the same way the Render deployment does. To work on the static files with a separate file server instead, set `window.MSIMU_API_BASE = "http://localhost:8080/api/v1"` before `js/config.js` loads; the CORS defaults already allow localhost origins.
 
 The database is in-memory and rebuilt on every start, including the demo portfolio below.
 
 ### Run the tests
 
 ```bash
-mvn test        # 109 tests: unit + Spring integration tests
+mvn test        # 113 tests: unit + Spring integration tests
 ```
 
 ## Demo accounts
@@ -152,13 +151,128 @@ All under `/api/v1`. Every endpoint except register and login needs `Authorizati
 | Variable | Default | Purpose |
 |---|---|---|
 | `TRACOM_JWT_SECRET` | dev-only value | JWT signing key (≥ 32 bytes) — **set this anywhere shared** |
-| `TRACOM_ADMIN_PASSWORD`, `TRACOM_DEMO_PASSWORD`, `TRACOM_AGENT_PASSWORD`, `TRACOM_MERCHANT_PASSWORD` | see table above | Seed account passwords |
+| `TRACOM_ADMIN_PASSWORD`, `TRACOM_DEMO_PASSWORD`, `TRACOM_STAFF_PASSWORD`, `TRACOM_AGENT_PASSWORD`, `TRACOM_MERCHANT_PASSWORD` | see table above | Seed account passwords |
 | `TRACOM_DEMO_PORTFOLIO` | `true` | Seed the demo portfolio |
+| `TRACOM_H2_CONSOLE_ENABLED` | `true` (local) / `false` (prod profile) | Enable the H2 web console |
+| `TRACOM_CORS_ALLOWED_ORIGINS` | `http://localhost:*,http://127.0.0.1:*` | Comma-separated CORS origin patterns; empty by default in the prod profile because the frontend is same-origin |
+| `PORT` | `8080` | HTTP port; Render injects this, the app binds `0.0.0.0` |
 | `TRACOM_ARREARS_CRON` | `0 5 0 * * *` | When the nightly arrears sweep runs |
 | `TRACOM_LOCK_GRACE_DAYS` | `2` | Days after a missed due date before the phone locks |
 | `TRACOM_AGENT_COMMISSION_RATE` / `_CAP` | `0.02` / `50` | Agent's share of each terminal collection, capped per payment |
 | `TRACOM_MERCHANT_COMMISSION_RATE` / `TRACOM_MERCHANT_SALE_FEE` | `0.005` / `300` | Merchant's override and fee per phone financed from its stock |
 | `TRACOM_SIMULATED_CUSTOMER_PHONE` | `true` | Lets the terminal play the customer's phone answering the M-PESA prompt. Set `false` with a live M-PESA callback |
+
+## Deployment on Render
+
+The presentation deployment runs as **one Render Docker Web Service**. Spring Boot serves the static pages *and* the `/api/v1` API from the same origin, so there is no second service, no cross-origin request and one URL to share with assessors.
+
+```
+Browser ──HTTPS──▶ Render edge (TLS) ──▶ Docker container
+                                          └─ Spring Boot on 0.0.0.0:$PORT
+                                              ├─ /              frontend pages (static)
+                                              ├─ /css /js       frontend assets (static)
+                                              ├─ /api/v1/**     JSON API, JWT-protected
+                                              ├─ /api/v1/health deployment probe (public)
+                                              └─ in-memory H2   rebuilt on every boot
+```
+
+**Why one service.** The frontend is plain HTML/CSS/ES modules with relative asset paths and no build step; `maven-resources-plugin` copies it into the jar at `static/`. Serving it from Spring Boot keeps API calls relative (`/api/v1`), keeps the JWT in the same-origin `sessionStorage`, removes the localhost CORS dependency and avoids a free static site plus a separate API host with its own CORS and mixed-content rules.
+
+**Why Docker.** Java is not a native Render runtime, so the service builds `Dockerfile` (multi-stage Java 17 + Maven → JRE 17, non-root user).
+
+### Files that implement the deployment
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Multi-stage build; packages the jar; runs as UID 1001; reads `PORT` |
+| `.dockerignore` | Keeps `.git`, `target`, docs and local env files out of the image |
+| `render.yaml` | Blueprint: free Docker web service, `/api/v1/health` check, environment variables |
+| `src/main/resources/application-prod.properties` | `prod` profile: H2 console off, JWT secret required, quiet error responses, graceful shutdown |
+| `src/main/java/com/tracom/lipamdogo/controller/HealthController.java` | Public `GET /api/v1/health` |
+| `docs/render-env.example` | Checklist of every environment variable (placeholders only) |
+| `pom.xml` | Copies `*.html`, `*.svg`, `css/`, `js/` into the jar's static resources |
+| `js/config.js` | Relative `API_BASE` (`/api/v1`) with an optional `window.MSIMU_API_BASE` override |
+
+### Deploy through the Blueprint (recommended)
+
+1. Push this repository, including `Dockerfile` and `render.yaml`, to GitHub.
+2. In the Render Dashboard choose **New → Blueprint**, connect `wanjikupng/msimu-finance` and select the branch that contains the deployment commit (`main` after merging).
+3. Render reads `render.yaml`. It generates `TRACOM_JWT_SECRET`; for each `sync: false` entry it asks you to type the seed password. Enter the documented demo values from the table above (or your own, then update `js/config.js`).
+4. Click **Apply**. The first image build typically takes a few minutes on the free plan; the service is routed traffic only after `/api/v1/health` returns 200.
+5. Open the service URL — `https://msimu-finance.onrender.com` if that name is available, otherwise the name shown in the Dashboard.
+
+### Deploy manually (without the Blueprint)
+
+**New → Web Service → Build and deploy from a Git repository**, then:
+
+| Setting | Value |
+|---|---|
+| Language / Runtime | Docker |
+| Branch | the deployment branch |
+| Dockerfile path | `./Dockerfile` |
+| Docker build context | `.` (repository root) |
+| Compute plan | Free |
+| Health check path | `/api/v1/health` |
+| Auto-deploy | On commit (or manual) |
+
+Add the environment variables from the table below in **Environment**. `PORT` is injected by Render and must not be set by hand.
+
+> If you connect the repository as a **Public Git Repository** instead of installing the Render GitHub app, Render does not support auto-deploys for that service. Deploy each change with **Manual Deploy → Deploy latest commit**. The Blueprint route (which uses the GitHub app) keeps auto-deploy.
+
+### Required environment variables
+
+| Variable | Required | Value for the presentation deployment |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | yes | `prod` |
+| `TRACOM_JWT_SECRET` | yes | Random ≥ 32 bytes. `render.yaml` uses `generateValue: true`; manually, `openssl rand -base64 48` |
+| `TRACOM_ADMIN_PASSWORD` | yes | Documented admin demo password (or your own) |
+| `TRACOM_DEMO_PASSWORD` | yes | Documented customer demo password (or your own) |
+| `TRACOM_STAFF_PASSWORD` | yes (portfolio on) | Password for the seeded loan-officer and payments-operator accounts |
+| `TRACOM_AGENT_PASSWORD` | yes | Documented agent demo password (or your own) |
+| `TRACOM_MERCHANT_PASSWORD` | yes | Documented merchant demo password (or your own) |
+| `TRACOM_DEMO_PORTFOLIO` | no | `true` (default) keeps the synthetic book of business |
+| `TRACOM_H2_CONSOLE_ENABLED` | no | `false`; the `prod` profile disables it regardless |
+| `PORT` | injected | Render sets it; the app listens on it and binds `0.0.0.0` |
+| `TRACOM_CORS_ALLOWED_ORIGINS` | only for split hosting | Comma-separated origins when the frontend is not served by this service |
+
+The seed passwords are configured **only** in the Render Dashboard, never in the repository. `js/config.js` contains the same values as *documented demo defaults* for the login page's quick-fill buttons; if you change a password in Render, update that list or the buttons will pre-fill a stale value.
+
+### Health check
+
+`GET /api/v1/health` is public and returns no application data:
+
+```json
+{"status":"UP","application":"lipa-mdogo-mdogo","database":"UP","readiness":"ACCEPTING_TRAFFIC","timestamp":"2026-01-01T00:00:00Z"}
+```
+
+It runs `SELECT 1` against the datasource and reports Spring Boot's readiness state. During startup (including the demo portfolio seed) it answers **503** with `"status":"STARTING"`; if the database is unreachable it answers **503** with `"status":"DOWN"`. Both are exactly what Render's HTTP health check should see, so traffic is routed only to a fully seeded instance.
+
+### Redeploying after a GitHub change
+
+- **Automatic:** `autoDeployTrigger: commit` in `render.yaml` means every push to the deployed branch builds and deploys. The health check gates the switch to the new instance.
+- **Manual:** Dashboard → service → **Manual Deploy → Deploy latest commit**.
+- **Rollback:** Dashboard → **Rollbacks** (the free plan keeps the two most recent deploys).
+
+### Free-plan behaviour to expect during the presentation
+
+- The service **spins down after 15 minutes without traffic** and takes roughly a minute to wake on the next request. Open the URL a few minutes before assessors arrive.
+- 512 MB RAM / 0.1 CPU. The image caps the JVM heap at 60% of the container (`-XX:MaxRAMPercentage=60`) and uses the serial collector, leaving room for metaspace and native memory.
+- 750 free instance-hours per workspace per month; a spun-down service does not consume them.
+- The filesystem is ephemeral, and so is the H2 database.
+
+### Database persistence
+
+The deployment keeps the application's **in-memory H2** database. It is created from `schema.sql`/`data.sql` on every boot, and `DemoPortfolioBootstrap` rebuilds the same 40-day demo book through the real services. Consequences:
+
+- A restart, redeploy, crash or free-plan spin-down **resets all data** to the seeded demo state; anything an assessor creates is lost.
+- The demo always starts from a known, reproducible state — an advantage for a presentation.
+- The H2 console is disabled in the `prod` profile and is not exposed publicly.
+
+**PostgreSQL was evaluated and intentionally not enabled for this deployment.** The schema uses portable `GENERATED BY DEFAULT AS IDENTITY` columns and the entities are plain JPA, so the SQL is close to portable — but `data.sql` deletes every table on each start (`spring.sql.init.mode=always`), which would wipe a persistent database just as surely as H2 resets. A correct switch needs versioned migrations (Flyway/Liquibase), a profile-specific datasource, and a full re-run of the integration suite; a free Render Postgres also expires 30 days after creation. Shipping that untested to a presentation deployment would add risk without adding persistence, so it is left as future work rather than a claim.
+
+### Prototype limits (unchanged by deployment)
+
+This is an academic prototype. M-PESA is a **mock adapter** with a simulated provider statement; there are no Safaricom credentials, no real STK push, no real B2C/B2B payout and no real money. Every "payment" is engine output against synthetic data. The public URL is a demonstration environment, not a production financial service.
 
 ## Documentation
 

@@ -1,0 +1,35 @@
+# Render environment template for M-Simu Finance.
+#
+# This file is a checklist, not a secret store. Render injects PORT itself and
+# the Blueprint generates TRACOM_JWT_SECRET; every <placeholder> below must be
+# supplied in the Render Dashboard and must never be committed.
+#
+# If you run the container manually:
+#   docker run -p 8080:10000 --env-file docs/render-env.example msimu-finance
+# replace the placeholders first.
+
+SPRING_PROFILES_ACTIVE=prod
+
+# Random value of at least 32 bytes. Generate with: openssl rand -base64 48
+TRACOM_JWT_SECRET=<generate-a-random-32-byte-or-longer-secret>
+
+# Seed credentials (academy demo accounts). Use the documented demo values so
+# assessors can sign in with the accounts printed in README.md, or choose your
+# own and update the login-page hints in js/config.js.
+TRACOM_ADMIN_PASSWORD=<demo-admin-password>
+TRACOM_DEMO_PASSWORD=<demo-customer-password>
+TRACOM_STAFF_PASSWORD=<demo-staff-password>
+TRACOM_AGENT_PASSWORD=<demo-agent-password>
+TRACOM_MERCHANT_PASSWORD=<demo-merchant-password>
+
+# Synthetic demo book of business (40 days) on first boot.
+TRACOM_DEMO_PORTFOLIO=true
+
+# Never expose the H2 console publicly; the prod profile already disables it.
+TRACOM_H2_CONSOLE_ENABLED=false
+
+# Prototype only: terminal simulator plays the customer's phone. No real M-PESA.
+TRACOM_SIMULATED_CUSTOMER_PHONE=true
+
+# Optional: only when the frontend is hosted on a different origin.
+# TRACOM_CORS_ALLOWED_ORIGINS=https://your-static-site.example.com

@@ -100,7 +100,7 @@ export async function api(path, { method, body, headers = {}, redirectOn401 = tr
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError(0, "Cannot reach the server on port 8080. Is the backend running?");
+    throw new ApiError(0, "Cannot reach the server. Check your connection and try again.");
   }
 
   if (res.status === 401) {

@@ -1,0 +1,18 @@
+# Build context hygiene for the deployment image.
+# The image needs pom.xml, src/, the root *.html pages, css/ and js/ only.
+
+.git
+.gitignore
+.github
+target
+docs
+*.md
+docker-compose.yml
+render.yaml
+.env
+.env.*
+.DS_Store
+.idea
+.vscode
+*.iml
+node_modules
