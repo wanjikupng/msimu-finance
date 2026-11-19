@@ -47,8 +47,6 @@ mvn test        # 113 tests: unit + Spring integration tests
 
 ## Demo accounts
 
-These are the **local development defaults**. A public/hosted deployment sets its own seed passwords through the `TRACOM_*_PASSWORD` variables (see [Deployment on Render](#deployment-on-render)); the login page's one-click demo buttons only appear on `localhost`, so a hosted deployment never pre-fills or discloses credentials.
-
 | Role | Email | Password | Lands on |
 |---|---|---|---|
 | Admin | `admin@tracom.local` | `Admin@1234` | Staff console (everything) |
@@ -199,7 +197,7 @@ Browser ──HTTPS──▶ Render edge (TLS) ──▶ Docker container
 
 1. Push this repository, including `Dockerfile` and `render.yaml`, to GitHub.
 2. In the Render Dashboard choose **New → Blueprint**, connect `wanjikupng/msimu-finance` and select the branch that contains the deployment commit (`main` after merging).
-3. Render reads `render.yaml`. It generates `TRACOM_JWT_SECRET`; for each `sync: false` entry it asks you to type a seed password. Use a **private** value for each account (for example `openssl rand -base64 18`); do not reuse the publicly documented development passwords for the administrator account. The one-click demo buttons are hidden outside `localhost`, so the deployed login page does not pre-fill them. Keep the values outside the repository and share them with assessors separately.
+3. Render reads `render.yaml`. It generates `TRACOM_JWT_SECRET`; for each `sync: false` entry it asks you to type the seed password. Enter the documented demo values from the table above (or your own, then update `js/config.js`).
 4. Click **Apply**. The first image build typically takes a few minutes on the free plan; the service is routed traffic only after `/api/v1/health` returns 200.
 5. Open the service URL — `https://msimu-finance.onrender.com` if that name is available, otherwise the name shown in the Dashboard.
 
@@ -227,17 +225,17 @@ Add the environment variables from the table below in **Environment**. `PORT` is
 |---|---|---|
 | `SPRING_PROFILES_ACTIVE` | yes | `prod` |
 | `TRACOM_JWT_SECRET` | yes | Random ≥ 32 bytes. `render.yaml` uses `generateValue: true`; manually, `openssl rand -base64 48` |
-| `TRACOM_ADMIN_PASSWORD` | yes | Private value (not the README development default) |
-| `TRACOM_DEMO_PASSWORD` | yes | Private value shared with the customer demo accounts |
-| `TRACOM_STAFF_PASSWORD` | yes (portfolio on) | Private value for the seeded loan-officer and payments-operator accounts |
-| `TRACOM_AGENT_PASSWORD` | yes | Private value shared with the demo agents |
-| `TRACOM_MERCHANT_PASSWORD` | yes | Private value shared with the demo merchants |
+| `TRACOM_ADMIN_PASSWORD` | yes | Documented admin demo password (or your own) |
+| `TRACOM_DEMO_PASSWORD` | yes | Documented customer demo password (or your own) |
+| `TRACOM_STAFF_PASSWORD` | yes (portfolio on) | Password for the seeded loan-officer and payments-operator accounts |
+| `TRACOM_AGENT_PASSWORD` | yes | Documented agent demo password (or your own) |
+| `TRACOM_MERCHANT_PASSWORD` | yes | Documented merchant demo password (or your own) |
 | `TRACOM_DEMO_PORTFOLIO` | no | `true` (default) keeps the synthetic book of business |
 | `TRACOM_H2_CONSOLE_ENABLED` | no | `false`; the `prod` profile disables it regardless |
 | `PORT` | injected | Render sets it; the app listens on it and binds `0.0.0.0` |
 | `TRACOM_CORS_ALLOWED_ORIGINS` | only for split hosting | Comma-separated origins when the frontend is not served by this service |
 
-The seed passwords are configured **only** in the Render Dashboard, never in the repository. `js/config.js` keeps the development defaults for local convenience, but the login page only renders the one-click demo buttons when it is served from `localhost`, so the deployed site neither pre-fills nor reveals credentials.
+The seed passwords are configured **only** in the Render Dashboard, never in the repository. `js/config.js` contains the same values as *documented demo defaults* for the login page's quick-fill buttons; if you change a password in Render, update that list or the buttons will pre-fill a stale value.
 
 ### Health check
 
